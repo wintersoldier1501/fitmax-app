@@ -1,0 +1,153 @@
+.main {
+  min-height: 100vh;
+  padding: 2rem 1.5rem;
+  padding-bottom: 100px; /* Space for BottomNav */
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.title {
+  font-size: 1.8rem;
+  font-weight: 800;
+  margin: 0;
+  color: var(--text-main);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.clearButton {
+  background: none;
+  border: none;
+  color: var(--primary);
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0.5rem;
+}
+
+.timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  position: relative;
+}
+
+.timeline::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 20px;
+  width: 2px;
+  background-color: var(--border);
+  z-index: 0;
+}
+
+.foodCard {
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 1.2rem;
+  display: flex;
+  gap: 1rem;
+  position: relative;
+  z-index: 1;
+  margin-left: 45px;
+}
+
+.timelineDot {
+  position: absolute;
+  left: -31px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 14px;
+  height: 14px;
+  background-color: var(--primary);
+  border-radius: 50%;
+  border: 3px solid var(--bg-dark);
+  box-shadow: 0 0 10px rgba(255, 69, 0, 0.5);
+}
+
+.foodImageContainer {
+  width: 60px;
+  height: 60px;
+  border-radius: 12px;
+  overflow: hidden;
+  background-color: var(--bg-surface-hover);
+  flex-shrink: 0;
+}
+
+.foodImageContainer img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.foodInfo {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.foodHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 0.5rem;
+}
+
+.foodName {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-main);
+  margin: 0;
+}
+
+.foodTime {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.macrosRow {
+  display: flex;
+  gap: 1rem;
+  font-size: 0.8rem;
+}
+
+.macroItem {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.macroLabel {
+  color: var(--text-muted);
+}
+
+.macroValue {
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.emptyState {
+  text-align: center;
+  padding: 3rem 1rem;
+  color: var(--text-muted);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+}
+
+.emptyIcon {
+  font-size: 3rem;
+  opacity: 0.5;
+}

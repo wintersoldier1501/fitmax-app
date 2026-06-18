@@ -1,0 +1,179 @@
+.main {
+  min-height: 100vh;
+  padding: 2rem 1.5rem;
+  padding-bottom: 100px;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.backButton {
+  font-size: 1.5rem;
+  color: var(--text-main);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+}
+
+.title {
+  font-size: 1.5rem;
+  font-weight: 800;
+  margin: 0;
+  color: var(--text-main);
+}
+
+.toggleContainer {
+  display: flex;
+  background-color: var(--bg-surface);
+  border-radius: 12px;
+  padding: 4px;
+  margin-top: 1rem;
+}
+
+.toggleButton {
+  flex: 1;
+  padding: 0.8rem;
+  text-align: center;
+  border: none;
+  border-radius: 8px;
+  font-weight: 700;
+  cursor: pointer;
+  background: transparent;
+  color: var(--text-muted);
+  transition: all 0.3s;
+}
+
+.toggleButton.active {
+  background-color: var(--primary);
+  color: white;
+  box-shadow: 0 4px 10px rgba(255, 69, 0, 0.4);
+}
+
+.workoutCard {
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.workoutHeader {
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 1rem;
+}
+
+.workoutTitle {
+  font-size: 1.2rem;
+  color: var(--primary);
+  margin: 0 0 0.5rem 0;
+}
+
+.workoutDesc {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  margin: 0;
+}
+
+.exerciseList {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.exerciseItem {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem;
+  background-color: var(--bg-dark);
+  border-radius: 12px;
+  transition: all 0.3s;
+  cursor: pointer;
+}
+
+.exerciseItem.completed {
+  opacity: 0.5;
+  background-color: var(--bg-surface-hover);
+}
+
+.checkbox {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  border: 2px solid var(--primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--primary);
+  font-weight: bold;
+}
+
+.exerciseItem.completed .checkbox {
+  background-color: var(--primary);
+  color: white;
+}
+
+.exerciseInfo {
+  flex: 1;
+}
+
+.exerciseName {
+  font-weight: 700;
+  margin: 0;
+  color: var(--text-main);
+}
+
+.exerciseItem.completed .exerciseName {
+  text-decoration: line-through;
+}
+
+.exerciseReps {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin: 0.2rem 0 0 0;
+}
+
+.completeButton {
+  width: 100%;
+  padding: 1.2rem;
+  background-color: var(--primary);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  font-size: 1.1rem;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 5px 15px rgba(255, 69, 0, 0.4);
+  transition: all 0.3s;
+}
+
+.completeButton:disabled {
+  background-color: var(--bg-surface-hover);
+  color: var(--text-muted);
+  box-shadow: none;
+  cursor: not-allowed;
+}
+
+.successMessage {
+  text-align: center;
+  color: #00E5FF;
+  font-weight: 800;
+  font-size: 1.2rem;
+  padding: 2rem 0;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% { opacity: 0.8; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.05); }
+  100% { opacity: 0.8; transform: scale(1); }
+}

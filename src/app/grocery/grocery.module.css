@@ -1,0 +1,129 @@
+.main {
+  min-height: 100vh;
+  background-color: var(--bg-dark);
+  color: var(--text-main);
+  padding: 1.5rem;
+  padding-bottom: 6rem;
+  max-width: 480px;
+  margin: 0 auto;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+  padding-top: 1rem;
+}
+
+.title {
+  font-size: 1.8rem;
+  font-weight: 800;
+  margin: 0;
+  letter-spacing: -0.5px;
+}
+
+.emptyState {
+  text-align: center;
+  padding: 4rem 1rem;
+  background: var(--bg-surface);
+  border-radius: 16px;
+  border: 1px dashed var(--border);
+}
+
+.emptyIcon {
+  font-size: 4rem;
+  margin-bottom: 1rem;
+  display: block;
+}
+
+.categorySection {
+  margin-bottom: 2rem;
+}
+
+.categoryTitle {
+  font-size: 1.2rem;
+  color: var(--primary);
+  margin-bottom: 1rem;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 0.5rem;
+}
+
+.itemCard {
+  display: flex;
+  align-items: center;
+  background-color: var(--bg-surface);
+  padding: 1rem;
+  border-radius: 12px;
+  margin-bottom: 0.8rem;
+  border: 1px solid var(--border);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.itemCard.checked {
+  opacity: 0.5;
+  background-color: rgba(0, 0, 0, 0.2);
+}
+
+.checkbox {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  border: 2px solid var(--primary);
+  margin-right: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.itemCard.checked .checkbox {
+  background-color: var(--primary);
+}
+
+.itemName {
+  font-weight: 600;
+  font-size: 1.1rem;
+  flex: 1;
+}
+
+.itemCard.checked .itemName {
+  text-decoration: line-through;
+  color: var(--text-muted);
+}
+
+.itemQty {
+  font-weight: bold;
+  color: var(--text-muted);
+}
+
+.addForm {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 2rem;
+}
+
+.input {
+  flex: 1;
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border);
+  color: white;
+  padding: 0.8rem;
+  border-radius: 8px;
+  font-size: 1rem;
+}
+
+.input:focus {
+  outline: none;
+  border-color: var(--primary);
+}
+
+.addButton {
+  background-color: var(--primary);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 0 1.5rem;
+  font-weight: bold;
+  cursor: pointer;
+}
