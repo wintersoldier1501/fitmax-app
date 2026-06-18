@@ -38,36 +38,49 @@ export default function DietCenter() {
         </div>
       ) : (
         <>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <span className={styles.budgetBadge}>Presupuesto {customDiet.budget}</span>
-            <span style={{ color: "var(--text-muted)", fontSize: "0.9rem" }}>~{customDiet.totalCalories} kcal</span>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem" }}>
+            <div style={{ display: "flex", flexDirection: "column" }}>
+              <span style={{ fontSize: "1.5rem", fontWeight: "bold", color: "var(--primary)" }}>Plan Activo</span>
+              <span style={{ color: "var(--text-muted)", fontSize: "0.9rem" }}>~{customDiet.totalCalories} kcal (Nivel {customDiet.budget})</span>
+            </div>
+            <button 
+              className={styles.buildButton}
+              onClick={() => router.push("/diet/builder")}
+              style={{ width: "auto", padding: "0.5rem 1rem", margin: 0, fontSize: "0.9rem", background: "transparent", border: "1px solid var(--primary)", color: "var(--primary)" }}
+            >
+              🪄 Regenerar
+            </button>
           </div>
 
-          <div style={{ backgroundColor: "rgba(0, 229, 255, 0.1)", borderLeft: "4px solid #00E5FF", padding: "1rem", borderRadius: "8px", fontSize: "0.85rem", color: "var(--text-muted)", marginTop: "1rem" }}>
-            💡 <strong>¿Porciones altas?</strong> La IA calcula la cantidad exacta para que cumplas tus macros solo con ese alimento. Si te tocan 11 huevos, es porque necesitas muchísima proteína y los huevos son tu única fuente en esa comida.
+          <div style={{ backgroundColor: "rgba(0, 229, 255, 0.1)", borderLeft: "4px solid #00E5FF", padding: "1rem", borderRadius: "8px", fontSize: "0.85rem", color: "var(--text-muted)", marginBottom: "1.5rem" }}>
+            👨‍🍳 <strong>Generado por IA:</strong> Tus porciones y comidas han sido calculadas inteligentemente para cuadrar tus requerimientos exactos de hipertrofia o recomposición.
           </div>
 
-          <div className={styles.dietCard} style={{ marginTop: "1rem" }}>
+          <div className={styles.dietCard} style={{ marginTop: "1rem", background: "transparent", padding: 0 }}>
             {customDiet.meals.map((meal: any, index: number) => (
-              <div key={index} className={styles.mealSection}>
-                <div className={styles.mealHeader}>
-                  <h3 className={styles.mealName}>{meal.name}</h3>
-                  <span className={styles.mealMacros}>
-                    {meal.macros.protein}g P | {meal.macros.carbs}g C | {meal.macros.fats}g G
-                  </span>
+              <div key={index} className={styles.mealSection} style={{ background: "var(--bg-surface)", padding: "1.5rem", borderRadius: "16px", marginBottom: "1rem", border: "1px solid rgba(255,255,255,0.05)" }}>
+                <div className={styles.mealHeader} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem", borderBottom: "1px solid rgba(255,255,255,0.05)", paddingBottom: "1rem" }}>
+                  <h3 className={styles.mealName} style={{ fontSize: "1.2rem", margin: 0 }}>{meal.name}</h3>
+                  <div style={{ display: "flex", gap: "0.5rem", fontSize: "0.75rem", fontWeight: "bold" }}>
+                    <span style={{ background: "rgba(255,69,0,0.1)", color: "var(--primary)", padding: "0.2rem 0.5rem", borderRadius: "8px" }}>{meal.macros.protein}g P</span>
+                    <span style={{ background: "rgba(0,229,255,0.1)", color: "#00E5FF", padding: "0.2rem 0.5rem", borderRadius: "8px" }}>{meal.macros.carbs}g C</span>
+                    <span style={{ background: "rgba(255,215,0,0.1)", color: "#FFD700", padding: "0.2rem 0.5rem", borderRadius: "8px" }}>{meal.macros.fats}g G</span>
+                  </div>
                 </div>
                 
-                {meal.foods.map((food: any, fIndex: number) => (
-                  <div key={fIndex} className={styles.foodItem}>
-                    <div className={styles.foodInfo}>
-                      <span className={styles.foodIcon}>{food.icon}</span>
-                      <div>
-                        <p className={styles.foodName}>{food.name}</p>
-                        <p className={styles.foodAmount}>{food.amount}</p>
+                <div style={{ display: "flex", flexDirection: "column", gap: "0.8rem" }}>
+                  {meal.foods.map((food: any, fIndex: number) => (
+                    <div key={fIndex} className={styles.foodItem} style={{ background: "rgba(0,0,0,0.2)", padding: "1rem", borderRadius: "12px", border: "1px solid rgba(255,255,255,0.02)" }}>
+                      <div className={styles.foodInfo} style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
+                        <span className={styles.foodIcon} style={{ fontSize: "2rem", background: "rgba(255,255,255,0.05)", padding: "0.5rem", borderRadius: "12px" }}>{food.icon}</span>
+                        <div style={{ flex: 1 }}>
+                          <p className={styles.foodName} style={{ margin: 0, fontWeight: "bold", fontSize: "1rem" }}>{food.name}</p>
+                          <p className={styles.foodAmount} style={{ margin: 0, color: "var(--text-muted)", fontSize: "0.85rem", marginTop: "0.2rem" }}>Porción exacta: {food.amount}</p>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
             ))}
           </div>
@@ -75,16 +88,9 @@ export default function DietCenter() {
           <button 
             className={styles.rebuildButton}
             onClick={() => router.push("/grocery")}
-            style={{ marginBottom: "1rem", backgroundColor: "white", color: "black" }}
+            style={{ marginBottom: "2rem", backgroundColor: "white", color: "black", width: "100%", padding: "1rem", borderRadius: "12px", fontWeight: "bold", border: "none", cursor: "pointer", display: "flex", justifyContent: "center", alignItems: "center", gap: "0.5rem" }}
           >
-            🛒 Ver Lista de Súper (Semanal)
-          </button>
-
-          <button 
-            className={styles.rebuildButton}
-            onClick={() => router.push("/diet/builder")}
-          >
-            🔄 Recalcular Dieta
+            🛒 Ver Lista de Súper (Generada)
           </button>
         </>
       )}

@@ -28,16 +28,16 @@ export const StaggeredText = ({ text, className = "", delay = 0 }: StaggeredText
         type: "spring",
         damping: 12,
         stiffness: 100,
-      },
+      } as any,
     },
     hidden: {
       opacity: 0,
-      y: 50,
+      y: 20,
       transition: {
         type: "spring",
         damping: 12,
         stiffness: 100,
-      },
+      } as any,
     },
   };
 

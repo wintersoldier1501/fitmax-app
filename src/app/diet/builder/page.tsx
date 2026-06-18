@@ -74,9 +74,7 @@ export default function DietBuilder() {
   const [budget, setBudget] = useState<"economico" | "premium">("economico");
   
   const [selections, setSelections] = useState<any>({
-    0: { protein: [], carbs: [], fats: [] },
-    1: { protein: [], carbs: [], fats: [] },
-    2: { protein: [], carbs: [], fats: [] }
+    protein: [], carbs: [], fats: []
   });
 
   // Custom AI Foods State
@@ -91,27 +89,17 @@ export default function DietBuilder() {
 
   if (!isLoaded) return null;
 
-  const currentMealIndex = step - 1;
   const isBudgetStep = step === 0;
 
-  const mealTarget = {
-    protein: Math.round(targetMacros.protein / 3),
-    carbs: Math.round(targetMacros.carbs / 3),
-    fats: Math.round(targetMacros.fats / 3),
-  };
-
   const handleSelect = (category: string, id: string) => {
-    const currentSels = selections[currentMealIndex][category];
+    const currentSels = selections[category];
     const isSelected = currentSels.includes(id);
     
     setSelections({
       ...selections,
-      [currentMealIndex]: {
-        ...selections[currentMealIndex],
-        [category]: isSelected 
-          ? currentSels.filter((i: string) => i !== id) 
-          : [...currentSels, id]
-      }
+      [category]: isSelected 
+        ? currentSels.filter((i: string) => i !== id) 
+        : [...currentSels, id]
     });
   };
 
@@ -191,7 +179,7 @@ export default function DietBuilder() {
     }, 3000);
   };
 
-  const currentSelection = isBudgetStep ? null : selections[currentMealIndex];
+  const currentSelection = isBudgetStep ? null : selections;
   
   const getProgress = (category: string) => {
     if (isBudgetStep) return 0;
@@ -206,55 +194,98 @@ export default function DietBuilder() {
   };
 
   const nextStep = () => {
-    if (step < 3) {
-      setStep(step + 1);
+    if (step === 0) {
+      setStep(1);
     } else {
-      const db = foodDB[budget];
-      const meals = [0, 1, 2].map((mIdx) => {
-        const sel = selections[mIdx];
-        
-        const getFoods = (ids: string[], cat: string) => 
-          ids.map(id => db[cat as keyof typeof db].find((f: any) => f.id === id) || customFoods[cat].find((f: any) => f.id === id)).filter(Boolean);
-
-        const pFoods = getFoods(sel.protein, "protein");
-        const cFoods = getFoods(sel.carbs, "carbs");
-        const fFoods = getFoods(sel.fats, "fats");
-        
-        const calcAmount = (target: number, ratio: number, unit: string) => {
-          if (!ratio) return `${target}g`;
-          const amt = target / ratio;
-          if (unit === "g") return `${Math.round(amt)} ${unit}`;
-          return `${Math.round(amt * 10) / 10} ${unit}`;
-        };
-
-        const mapFoods = (foods: any[], totalTarget: number) => {
-          const targetPerFood = totalTarget / foods.length;
-          return foods.map(f => ({
-            name: f.name,
-            icon: f.icon,
-            amount: calcAmount(targetPerFood, f.ratio || 1, f.unit || "g")
-          }));
-        };
-
-        return {
-          name: mealStages[mIdx],
-          macros: mealTarget,
-          foods: [
-            ...mapFoods(pFoods, mealTarget.protein),
-            ...mapFoods(cFoods, mealTarget.carbs),
-            ...mapFoods(fFoods, mealTarget.fats)
-          ]
-        };
-      });
-
-      saveDiet({
-        budget: budget === "economico" ? "Económico" : "Premium",
-        totalCalories: targetMacros.calories,
-        meals: meals
-      });
-
-      router.push("/diet");
+      generateProfessionalDiet();
     }
+  };
+
+  // --- SMART PORTIONS ALGORITHM (PHASE 15) ---
+  const generateProfessionalDiet = () => {
+    const db = foodDB[budget];
+    const sel = selections;
+    
+    // Combine selected standard foods + custom AI foods
+    const getFoods = (ids: string[], cat: string) => 
+      ids.map(id => db[cat as keyof typeof db].find((f: any) => f.id === id) || customFoods[cat].find((f: any) => f.id === id)).filter(Boolean);
+
+    const pFoods = getFoods(sel.protein, "protein");
+    const cFoods = getFoods(sel.carbs, "carbs");
+    const fFoods = getFoods(sel.fats, "fats");
+    
+    // Fallbacks if user didn't select enough
+    if (pFoods.length === 0) pFoods.push(db.protein[0]);
+    if (cFoods.length === 0) cFoods.push(db.carbs[0]);
+    if (fFoods.length === 0) fFoods.push(db.fats[0]);
+
+    // Randomizer helper
+    const getRandom = (arr: any[]) => arr[Math.floor(Math.random() * arr.length)];
+
+    const calcAmount = (target: number, ratio: number, unit: string) => {
+      if (!ratio) return `${target}g`;
+      const amt = target / ratio;
+      if (unit === "g") return `${Math.round(amt)} ${unit}`;
+      return `${Math.round(amt * 10) / 10} ${unit}`;
+    };
+
+    // The AI Master Chef logic: Combines foods logically per meal
+    const generateMeal = (name: string, macroTarget: any, pCount: number, cCount: number, fCount: number) => {
+      // Pick random ingredients from user favorites
+      const mealP = Array.from({ length: pCount }).map(() => getRandom(pFoods));
+      const mealC = Array.from({ length: cCount }).map(() => getRandom(cFoods));
+      const mealF = Array.from({ length: fCount }).map(() => getRandom(fFoods));
+
+      // Remove duplicates
+      const uniqueP = [...new Set(mealP)];
+      const uniqueC = [...new Set(mealC)];
+      const uniqueF = [...new Set(mealF)];
+
+      // Divide macros among unique items
+      const mapFoods = (foods: any[], totalMacro: number) => {
+        if (foods.length === 0) return [];
+        const macroPerFood = totalMacro / foods.length;
+        return foods.map(f => ({
+          name: f.name,
+          icon: f.icon,
+          amount: calcAmount(macroPerFood, f.ratio || 1, f.unit || "g")
+        }));
+      };
+
+      return {
+        name,
+        macros: macroTarget,
+        foods: [
+          ...mapFoods(uniqueP, macroTarget.protein),
+          ...mapFoods(uniqueC, macroTarget.carbs),
+          ...mapFoods(uniqueF, macroTarget.fats)
+        ]
+      };
+    };
+
+    // Professional Meal Distribution (3 main meals + 1 snack)
+    const mP = targetMacros.protein;
+    const mC = targetMacros.carbs;
+    const mF = targetMacros.fats;
+
+    const meals = [
+      // Breakfast: 25% macros, 1 Protein, 1 Carb, 1 Fat
+      generateMeal("Desayuno", { protein: Math.round(mP*0.25), carbs: Math.round(mC*0.25), fats: Math.round(mF*0.25) }, 1, 1, 1),
+      // Lunch: 35% macros, 2 Proteins (e.g. Chicken + Beef), 1 Carb, 1 Fat
+      generateMeal("Almuerzo", { protein: Math.round(mP*0.35), carbs: Math.round(mC*0.35), fats: Math.round(mF*0.35) }, 2, 1, 1),
+      // Snack: 15% macros, 1 Protein (e.g. Whey), 1 Carb
+      generateMeal("Snack Pre-Entreno", { protein: Math.round(mP*0.15), carbs: Math.round(mC*0.15), fats: Math.round(mF*0.15) }, 1, 1, 0),
+      // Dinner: 25% macros, 1 Protein, 0 Carbs (or light carbs), 1 Fat
+      generateMeal("Cena", { protein: Math.round(mP*0.25), carbs: Math.round(mC*0.25), fats: Math.round(mF*0.25) }, 1, 0, 1),
+    ];
+
+    saveDiet({
+      budget: budget === "economico" ? "Económico" : "Premium",
+      totalCalories: targetMacros.calories,
+      meals: meals
+    });
+
+    router.push("/diet");
   };
 
   const renderList = (category: "protein"|"carbs"|"fats", title: string) => {
@@ -262,7 +293,7 @@ export default function DietBuilder() {
     return (
       <div className={styles.foodCategory}>
         <h3 className={styles.categoryTitle}>{title}</h3>
-        <p style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginBottom: "1rem" }}>Puedes seleccionar varias opciones para dividir la porción.</p>
+        <p style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginBottom: "1rem" }}>La IA creará tus platillos usando estas bases.</p>
         <div className={styles.foodGrid}>
           {list.map((f: any) => (
             <div 
@@ -276,11 +307,7 @@ export default function DietBuilder() {
           ))}
           <div className={styles.customFoodButton} onClick={() => openCustomModal(category)}>
             <span className={styles.foodOptionIcon}>✨</span>
-            <p className={styles.foodOptionName}>Texto IA</p>
-          </div>
-          <div className={styles.customFoodButton} onClick={() => openScannerModal(category)}>
-            <span className={styles.foodOptionIcon}>📸</span>
-            <p className={styles.foodOptionName}>Escanear</p>
+            <p className={styles.foodOptionName}>Antojo IA</p>
           </div>
         </div>
       </div>
@@ -298,7 +325,7 @@ export default function DietBuilder() {
         <button className={styles.backButton} onClick={() => step === 0 ? router.back() : setStep(step - 1)}>
           ←
         </button>
-        <h1 className={styles.title}>Constructor de Dieta</h1>
+        <h1 className={styles.title}>Motor Nutricional IA</h1>
       </header>
 
       <AnimatePresence mode="wait">
@@ -337,39 +364,21 @@ export default function DietBuilder() {
           </motion.div>
         ) : (
           <motion.div 
-            key={`meal-${step}`}
+            key="preferences"
             className={styles.stepContainer}
             initial={{ opacity: 0, x: 50 }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -50 }}
           >
-            <h2 className={styles.stepTitle}>Paso {step + 1}: {mealStages[currentMealIndex]}</h2>
-            
-            <div className={styles.progressContainer}>
-              <div className={styles.progressBarCol}>
-                <div className={styles.progressLabel}><span>Proteína</span><span>{mealTarget.protein}g</span></div>
-                <div className={styles.progressTrack}>
-                  <div className={styles.progressFill} style={{ width: `${getProgress('protein')}%`, backgroundColor: "var(--primary)" }} />
-                </div>
-              </div>
-              <div className={styles.progressBarCol}>
-                <div className={styles.progressLabel}><span>Carbos</span><span>{mealTarget.carbs}g</span></div>
-                <div className={styles.progressTrack}>
-                  <div className={styles.progressFill} style={{ width: `${getProgress('carbs')}%`, backgroundColor: "#00E5FF" }} />
-                </div>
-              </div>
-              <div className={styles.progressBarCol}>
-                <div className={styles.progressLabel}><span>Grasas</span><span>{mealTarget.fats}g</span></div>
-                <div className={styles.progressTrack}>
-                  <div className={styles.progressFill} style={{ width: `${getProgress('fats')}%`, backgroundColor: "#FFD700" }} />
-                </div>
-              </div>
-            </div>
+            <h2 className={styles.stepTitle}>Paso 2: Tus Ingredientes Favoritos</h2>
+            <p style={{ color: "var(--text-muted)", fontSize: "0.9rem", marginBottom: "1.5rem" }}>
+              Selecciona todo lo que te guste. La IA del Master Chef combinará inteligentemente estos ingredientes en platos reales calculados exactamente a tus macros.
+            </p>
 
             <div style={{ overflowY: "auto", flex: 1, paddingBottom: "2rem" }}>
-              {renderList("protein", "Elige tus Proteínas")}
-              {renderList("carbs", "Elige tus Carbohidratos")}
-              {renderList("fats", "Elige tus Grasas")}
+              {renderList("protein", "🥩 Proteínas")}
+              {renderList("carbs", "🌾 Carbohidratos")}
+              {renderList("fats", "🥑 Grasas Saludables")}
             </div>
           </motion.div>
         )}
@@ -381,7 +390,7 @@ export default function DietBuilder() {
           disabled={!canProceed()}
           onClick={nextStep}
         >
-          {step === 3 ? "Generar Plan Maestro" : "Siguiente"}
+          {step === 1 ? "🪄 Auto-Generar Menú Pro" : "Siguiente"}
         </button>
       </div>
 
@@ -392,18 +401,18 @@ export default function DietBuilder() {
               <div className={styles.loadingSpinner}>
                 <span style={{ fontSize: "3rem", animation: "spin 2s linear infinite" }}>🔄</span>
                 <h3>Analizando con IA...</h3>
-                <p style={{ textAlign: "center", color: "var(--text-muted)" }}>Buscando "{customInput}" en la base de datos global y extrayendo macros.</p>
+                <p style={{ textAlign: "center", color: "var(--text-muted)" }}>Calculando la densidad calórica de "{customInput}".</p>
               </div>
             ) : (
               <>
-                <h3 className={styles.modalTitle}>Buscador de Texto IA</h3>
+                <h3 className={styles.modalTitle}>Agregar Antojo</h3>
                 <p style={{ fontSize: "0.9rem", color: "var(--text-muted)", marginBottom: "1rem" }}>
-                  Escribe lo que quieres agregar como {modalCategory === "protein" ? "proteína" : modalCategory === "carbs" ? "carbohidrato" : "grasa"}.
+                  ¿Qué otro ingrediente quieres que la IA incluya en tus platos?
                 </p>
                 <input 
                   type="text" 
                   autoFocus
-                  placeholder="Ej: Hotcakes de proteína..." 
+                  placeholder="Ej: Hotcakes de proteína, Omelette..." 
                   className={styles.modalInput}
                   value={customInput}
                   onChange={(e) => setCustomInput(e.target.value)}
@@ -411,38 +420,7 @@ export default function DietBuilder() {
                 />
                 <div className={styles.modalActions}>
                   <button className={`${styles.modalBtn} ${styles.modalBtnCancel}`} onClick={() => setShowModal(false)}>Cancelar</button>
-                  <button className={`${styles.modalBtn} ${styles.modalBtnSubmit}`} onClick={handleCustomAnalyze}>Buscar 🔍</button>
-                </div>
-              </>
-            )}
-          </div>
-        </div>
-      )}
-
-      {showScanner && (
-        <div className={styles.modalOverlay}>
-          <div className={styles.modalContent}>
-            {isAnalyzing ? (
-              <div className={styles.loadingSpinner}>
-                <span style={{ fontSize: "3rem", animation: "spin 2s linear infinite" }}>🔄</span>
-                <h3>Extrayendo Tabla Nutricional...</h3>
-                <p style={{ textAlign: "center", color: "var(--text-muted)" }}>Convirtiendo imagen a datos de macros.</p>
-              </div>
-            ) : (
-              <>
-                <h3 className={styles.modalTitle}>Escáner Láser de Etiquetas</h3>
-                <p style={{ fontSize: "0.9rem", color: "var(--text-muted)", marginBottom: "1rem" }}>
-                  Apunta a la etiqueta nutricional del producto.
-                </p>
-                
-                <div className={styles.cameraView}>
-                  <div className={styles.scannerLine}></div>
-                  <span style={{ color: "rgba(255,255,255,0.3)" }}>Cámara Activa</span>
-                </div>
-
-                <div className={styles.modalActions}>
-                  <button className={`${styles.modalBtn} ${styles.modalBtnCancel}`} onClick={() => setShowScanner(false)}>Cancelar</button>
-                  <button className={`${styles.modalBtn} ${styles.modalBtnSubmit}`} onClick={handleScan}>Capturar 📸</button>
+                  <button className={`${styles.modalBtn} ${styles.modalBtnSubmit}`} onClick={handleCustomAnalyze}>Añadir ✨</button>
                 </div>
               </>
             )}

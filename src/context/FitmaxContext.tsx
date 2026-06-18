@@ -129,43 +129,47 @@ export const FitmaxProvider = ({ children }: { children: ReactNode }) => {
     document.documentElement.setAttribute('data-theme', theme);
   };
 
-  const calculateBiometrics = (data: UserProfile) => {
-    if (data.weight && data.height && data.neck && data.waist) {
-      // US Navy Formula (Male)
-      // %BF = 495 / (1.0324 - 0.19077 * log10(waist - neck) + 0.15456 * log10(height)) - 450
-      const bf = 495 / (1.0324 - 0.19077 * Math.log10(data.waist - data.neck) + 0.15456 * Math.log10(data.height)) - 450;
-      const bfValid = Math.max(2, Math.min(bf, 60)); // Clamp
-      const lean = data.weight - (data.weight * (bfValid / 100));
+  const setProfileAndCalculate = (profileData: UserProfile) => {
+    const updatedProfile = { ...profileData, avatar: profile.avatar };
+    setProfile(updatedProfile);
+    
+    let leanMass: number | null = null;
+    let bfValid: number | null = null;
+
+    if (updatedProfile.weight && updatedProfile.height && updatedProfile.neck && updatedProfile.waist) {
+      const bf = 495 / (1.0324 - 0.19077 * Math.log10(updatedProfile.waist - updatedProfile.neck) + 0.15456 * Math.log10(updatedProfile.height)) - 450;
+      bfValid = Math.max(2, Math.min(bf, 60));
+      leanMass = updatedProfile.weight - (updatedProfile.weight * (bfValid / 100));
       
       setBiometrics({
         bodyFatPercentage: Math.round(bfValid * 10) / 10,
-        leanMass: Math.round(lean * 10) / 10
+        leanMass: Math.round(leanMass * 10) / 10
       });
     }
-  };
 
-  const calculateMacros = (data: UserProfile) => {
-    if (!data.age || !data.weight || !data.height) return;
+    if (!updatedProfile.age || !updatedProfile.weight || !updatedProfile.height) return;
 
-    let bmr = 10 * data.weight + 6.25 * data.height - 5 * data.age;
-    bmr += data.sex === "H" ? 5 : -161;
+    let bmr = 0;
+    if (leanMass !== null) {
+      // Professional Katch-McArdle Formula (using Lean Body Mass)
+      bmr = 370 + (21.6 * leanMass);
+    } else {
+      // Standard Mifflin-St Jeor Formula
+      bmr = 10 * updatedProfile.weight + 6.25 * updatedProfile.height - 5 * updatedProfile.age;
+      bmr += updatedProfile.sex === "H" ? 5 : -161;
+    }
 
     const multipliers = { "Sedentario": 1.2, "Ligero": 1.375, "Moderado": 1.55, "Intenso": 1.725 };
-    const tdee = bmr * (multipliers[data.activityLevel as Activity] || 1.2);
+    const tdee = bmr * (multipliers[updatedProfile.activityLevel as Activity] || 1.2);
 
-    // Goal adjustments
     let calories = tdee;
-    if (data.goal === 'Perder Grasa') calories = tdee - 500;
-    if (data.goal === 'Subir de Peso Limpio') calories = tdee + 300;
+    if (updatedProfile.goal === 'Perder Grasa') calories = tdee - 500;
+    if (updatedProfile.goal === 'Subir de Peso Limpio') calories = tdee + 300;
+    // Recomposición Corporal = Maintenance (TDEE)
+
+    const protein = Math.round(updatedProfile.weight * 2.0);
+    const fats = Math.round(updatedProfile.weight * 0.9);
     
-    // Scientific Macro Distribution
-    // Protein: 2.0g/kg
-    const protein = Math.round(data.weight * 2.0);
-    
-    // Fats: 0.9g/kg
-    const fats = Math.round(data.weight * 0.9);
-    
-    // Carbs: Remaining calories
     const proteinCals = protein * 4;
     const fatsCals = fats * 9;
     const carbsCals = calories - proteinCals - fatsCals;
@@ -177,14 +181,6 @@ export const FitmaxProvider = ({ children }: { children: ReactNode }) => {
       carbs,
       fats,
     });
-  };
-
-  const setProfileAndCalculate = (profileData: UserProfile) => {
-    // Preserve avatar if it exists
-    const updatedProfile = { ...profileData, avatar: profile.avatar };
-    setProfile(updatedProfile);
-    calculateMacros(updatedProfile);
-    calculateBiometrics(updatedProfile);
   };
 
   const updateAvatar = (base64String: string) => {
