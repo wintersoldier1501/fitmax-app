@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode, useRef } from "react";
 import { auth, db, googleProvider } from "@/lib/firebase";
-import { onAuthStateChanged, signInWithPopup, signOut, User } from "firebase/auth";
+import { onAuthStateChanged, signInWithRedirect, signOut, User } from "firebase/auth";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 
 type Goal = "Perder Grasa" | "Recomposición Corporal" | "Subir de Peso Limpio";
@@ -150,7 +150,7 @@ export const FitmaxProvider = ({ children }: { children: ReactNode }) => {
 
   const loginWithGoogle = async () => {
     try {
-      await signInWithPopup(auth, googleProvider);
+      await signInWithRedirect(auth, googleProvider);
     } catch (error: any) {
       console.error("Google login failed", error);
       alert("Error al iniciar sesión: " + error.message);
