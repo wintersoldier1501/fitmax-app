@@ -151,8 +151,9 @@ export const FitmaxProvider = ({ children }: { children: ReactNode }) => {
   const loginWithGoogle = async () => {
     try {
       await signInWithPopup(auth, googleProvider);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Google login failed", error);
+      alert("Error al iniciar sesión: " + error.message);
     }
   };
 
