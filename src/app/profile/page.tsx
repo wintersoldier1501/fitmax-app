@@ -1,6 +1,7 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
+import { useState, useRef, useEffect } from "react";
 import styles from "./profile.module.css";
 import { useFitmax } from "@/context/FitmaxContext";
 import Link from "next/link";
