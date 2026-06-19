@@ -130,6 +130,15 @@ export const FloatingScanner = () => {
                 <ScanBarcode size={20} color="var(--primary)" />
                 <span style={{ fontFamily: "var(--font-sans)", fontWeight: 500, fontSize: "0.9rem" }}>Etiqueta Nutricional</span>
               </button>
+              <button 
+                onClick={() => { setShowMenu(false); window.location.href = "/log"; }}
+                style={{ padding: "1rem", background: "rgba(255,255,255,0.03)", border: "1px solid var(--border)", color: "white", textAlign: "left", borderRadius: "12px", cursor: "pointer", display: "flex", alignItems: "center", gap: "0.8rem", transition: "all 0.2s" }}
+                onMouseEnter={(e) => e.currentTarget.style.background = "rgba(255,255,255,0.08)"}
+                onMouseLeave={(e) => e.currentTarget.style.background = "rgba(255,255,255,0.03)"}
+              >
+                <span style={{ fontSize: "1.2rem" }}>🔍</span>
+                <span style={{ fontFamily: "var(--font-sans)", fontWeight: 500, fontSize: "0.9rem" }}>Buscador Manual</span>
+              </button>
             </motion.div>
           )}
         </AnimatePresence>
