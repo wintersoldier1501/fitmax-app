@@ -72,7 +72,12 @@ export default function Dashboard() {
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 0.5, delay: 0.3 }}
       >
-        <h2 className={styles.sectionTitle}>Tus Macros de Hoy</h2>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <h2 className={styles.sectionTitle}>Tus Macros de Hoy</h2>
+          <span style={{ fontSize: "0.9rem", color: "var(--primary)", fontWeight: "bold", background: "rgba(255, 51, 102, 0.15)", padding: "0.4rem 1rem", borderRadius: "12px", border: "1px solid rgba(255,51,102,0.3)" }}>
+            {Math.round((macros.protein.target * 4) + (macros.carbs.target * 4) + (macros.fats.target * 9))} kcal
+          </span>
+        </div>
         <div className={styles.macrosContainer}>
           <MacroRing 
             label="Proteína" 
