@@ -72,12 +72,7 @@ export default function Dashboard() {
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 0.5, delay: 0.3 }}
       >
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <h2 className={styles.sectionTitle}>Tus Macros de Hoy</h2>
-          <span style={{ fontSize: "0.9rem", color: "var(--primary)", fontWeight: "bold", background: "rgba(255, 51, 102, 0.15)", padding: "0.4rem 1rem", borderRadius: "12px", border: "1px solid rgba(255,51,102,0.3)" }}>
-            {Math.round((macros.protein.target * 4) + (macros.carbs.target * 4) + (macros.fats.target * 9))} kcal
-          </span>
-        </div>
+        <h2 className={styles.sectionTitle}>Tus Macros de Hoy</h2>
         <div className={styles.macrosContainer}>
           <MacroRing 
             label="Proteína" 
@@ -103,6 +98,12 @@ export default function Dashboard() {
             size={90}
             strokeWidth={8}
           />
+        </div>
+        <div className="glass-card" style={{ marginTop: "1rem", padding: "1rem", textAlign: "center", display: "flex", justifyContent: "space-between", alignItems: "center", border: "1px solid rgba(255, 255, 255, 0.05)" }}>
+          <span style={{ color: "var(--text-muted)", fontSize: "0.85rem", textTransform: "uppercase", letterSpacing: "1px" }}>Presupuesto Diario</span>
+          <span style={{ color: "white", fontSize: "1.2rem", fontWeight: "bold", fontFamily: "var(--font-display)" }}>
+            {Math.round((macros.protein.target * 4) + (macros.carbs.target * 4) + (macros.fats.target * 9))} <span style={{ color: "var(--primary)", fontSize: "0.9rem" }}>kcal</span>
+          </span>
         </div>
       </motion.section>
 
