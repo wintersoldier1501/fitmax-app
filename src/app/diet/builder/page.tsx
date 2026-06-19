@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import styles from "./builder.module.css";
 import { useFitmax } from "@/context/FitmaxContext";
 import { useRouter } from "next/navigation";
+import { PiggyBank, Gem, Wand2, Loader2 } from "lucide-react";
 
 // Simulated Food Database with math ratios
 const foodDB = {
@@ -340,24 +341,34 @@ export default function DietBuilder() {
             <h2 className={styles.stepTitle}>Paso 1: Elige tu Presupuesto</h2>
             <div className={styles.budgetGrid}>
               <div 
-                className={`${styles.budgetOption} ${budget === "economico" ? styles.selected : ""}`}
+                className={`glass-card ${styles.budgetOption} ${budget === "economico" ? styles.selected : ""}`}
                 onClick={() => setBudget("economico")}
+                style={{ padding: "1.5rem", border: `2px solid ${budget === "economico" ? "var(--primary)" : "transparent"}`, cursor: "pointer", transition: "all 0.3s" }}
               >
-                <span className={styles.budgetIcon}>🟢</span>
-                <div className={styles.budgetText}>
-                  <h3>Económico & Eficiente</h3>
-                  <p>Pollo, huevos, lentejas, arroz, avena.</p>
+                <div style={{ display: "flex", justifyContent: "center", marginBottom: "1rem" }}>
+                  <span style={{ padding: "1rem", background: "rgba(0, 229, 255, 0.1)", borderRadius: "50%", color: "#00E5FF" }}>
+                    <PiggyBank size={32} />
+                  </span>
+                </div>
+                <div className={styles.budgetText} style={{ textAlign: "center" }}>
+                  <h3 style={{ color: "white", marginBottom: "0.5rem", fontFamily: "var(--font-display)" }}>Económico & Eficiente</h3>
+                  <p style={{ color: "var(--text-muted)", fontSize: "0.9rem" }}>Pollo, huevos, lentejas, arroz, avena.</p>
                 </div>
               </div>
               
               <div 
-                className={`${styles.budgetOption} ${budget === "premium" ? styles.selected : ""}`}
+                className={`glass-card ${styles.budgetOption} ${budget === "premium" ? styles.selected : ""}`}
                 onClick={() => setBudget("premium")}
+                style={{ padding: "1.5rem", border: `2px solid ${budget === "premium" ? "var(--primary)" : "transparent"}`, cursor: "pointer", transition: "all 0.3s" }}
               >
-                <span className={styles.budgetIcon}>🔴</span>
-                <div className={styles.budgetText}>
-                  <h3>Premium & Gourmet</h3>
-                  <p>Salmón, cortes finos, aguacate, suplementos.</p>
+                <div style={{ display: "flex", justifyContent: "center", marginBottom: "1rem" }}>
+                  <span style={{ padding: "1rem", background: "rgba(255, 215, 0, 0.1)", borderRadius: "50%", color: "#FFD700" }}>
+                    <Gem size={32} />
+                  </span>
+                </div>
+                <div className={styles.budgetText} style={{ textAlign: "center" }}>
+                  <h3 style={{ color: "white", marginBottom: "0.5rem", fontFamily: "var(--font-display)" }}>Premium & Gourmet</h3>
+                  <p style={{ color: "var(--text-muted)", fontSize: "0.9rem" }}>Salmón, cortes finos, aguacate, suplementos.</p>
                 </div>
               </div>
             </div>
@@ -369,6 +380,7 @@ export default function DietBuilder() {
             initial={{ opacity: 0, x: 50 }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -50 }}
+            style={{ display: "flex", flexDirection: "column", height: "100%" }}
           >
             <h2 className={styles.stepTitle}>Paso 2: Tus Ingredientes Favoritos</h2>
             <p style={{ color: "var(--text-muted)", fontSize: "0.9rem", marginBottom: "1.5rem" }}>
@@ -384,43 +396,44 @@ export default function DietBuilder() {
         )}
       </AnimatePresence>
 
-      <div className={styles.navButtons}>
+      <div className={styles.navButtons} style={{ position: "fixed", bottom: "80px", left: 0, right: 0, padding: "1rem", background: "linear-gradient(to top, var(--bg-dark) 80%, transparent)" }}>
         <button 
-          className={styles.nextButton} 
+          className="glow-primary"
           disabled={!canProceed()}
           onClick={nextStep}
+          style={{ width: "100%", padding: "1rem", borderRadius: "12px", background: "var(--primary)", color: "white", fontWeight: "bold", border: "none", cursor: canProceed() ? "pointer" : "not-allowed", opacity: canProceed() ? 1 : 0.5, display: "flex", justifyContent: "center", alignItems: "center", gap: "0.5rem" }}
         >
-          {step === 1 ? "🪄 Auto-Generar Menú Pro" : "Siguiente"}
+          {step === 1 ? <><Wand2 size={20} /> Auto-Generar Menú Pro</> : "Siguiente"}
         </button>
       </div>
 
       {showModal && (
-        <div className={styles.modalOverlay}>
-          <div className={styles.modalContent}>
+        <div className={styles.modalOverlay} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.8)", backdropFilter: "blur(5px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100 }}>
+          <div className="glass-card" style={{ width: "90%", maxWidth: "400px", padding: "2rem" }}>
             {isAnalyzing ? (
-              <div className={styles.loadingSpinner}>
-                <span style={{ fontSize: "3rem", animation: "spin 2s linear infinite" }}>🔄</span>
-                <h3>Analizando con IA...</h3>
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "1rem" }}>
+                <Loader2 size={48} color="var(--primary)" className="animate-spin" />
+                <h3 style={{ color: "white" }}>Analizando con IA...</h3>
                 <p style={{ textAlign: "center", color: "var(--text-muted)" }}>Calculando la densidad calórica de "{customInput}".</p>
               </div>
             ) : (
               <>
-                <h3 className={styles.modalTitle}>Agregar Antojo</h3>
-                <p style={{ fontSize: "0.9rem", color: "var(--text-muted)", marginBottom: "1rem" }}>
+                <h3 style={{ color: "white", marginBottom: "0.5rem", fontSize: "1.2rem", fontFamily: "var(--font-display)" }}>Agregar Antojo</h3>
+                <p style={{ fontSize: "0.9rem", color: "var(--text-muted)", marginBottom: "1.5rem" }}>
                   ¿Qué otro ingrediente quieres que la IA incluya en tus platos?
                 </p>
                 <input 
                   type="text" 
                   autoFocus
                   placeholder="Ej: Hotcakes de proteína, Omelette..." 
-                  className={styles.modalInput}
+                  style={{ width: "100%", padding: "1rem", background: "var(--bg-dark)", border: "1px solid var(--border)", color: "white", borderRadius: "8px", marginBottom: "1.5rem" }}
                   value={customInput}
                   onChange={(e) => setCustomInput(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleCustomAnalyze()}
                 />
-                <div className={styles.modalActions}>
-                  <button className={`${styles.modalBtn} ${styles.modalBtnCancel}`} onClick={() => setShowModal(false)}>Cancelar</button>
-                  <button className={`${styles.modalBtn} ${styles.modalBtnSubmit}`} onClick={handleCustomAnalyze}>Añadir ✨</button>
+                <div style={{ display: "flex", gap: "1rem" }}>
+                  <button style={{ flex: 1, padding: "0.8rem", background: "transparent", border: "1px solid var(--border)", color: "white", borderRadius: "8px", cursor: "pointer" }} onClick={() => setShowModal(false)}>Cancelar</button>
+                  <button className="glow-primary" style={{ flex: 1, padding: "0.8rem", background: "var(--primary)", border: "none", color: "white", borderRadius: "8px", cursor: "pointer", fontWeight: "bold" }} onClick={handleCustomAnalyze}>Añadir ✨</button>
                 </div>
               </>
             )}

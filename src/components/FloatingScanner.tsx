@@ -4,6 +4,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useState, useRef } from "react";
 import { useFitmax } from "@/context/FitmaxContext";
 
+import { Camera, ScanBarcode, X } from "lucide-react";
+
 export const FloatingScanner = () => {
   const { addFoodLog, targetMacros } = useFitmax();
   const [isScanning, setIsScanning] = useState(false);
@@ -58,7 +60,7 @@ export const FloatingScanner = () => {
     <>
       <div style={{ 
         position: "relative", 
-        top: "-20px", 
+        top: "-25px", 
         width: "70px",
         height: "70px",
         zIndex: 100 
@@ -82,7 +84,7 @@ export const FloatingScanner = () => {
             borderRadius: "50%",
             zIndex: -1,
           }}
-          animate={{ scale: [1, 1.6], opacity: [0.6, 0] }}
+          animate={{ scale: [1, 1.4], opacity: [0.4, 0] }}
           transition={{ duration: 2, repeat: Infinity, ease: "easeOut" }}
         />
         
@@ -95,32 +97,38 @@ export const FloatingScanner = () => {
               exit={{ opacity: 0, y: 20, scale: 0.8 }}
               style={{
                 position: "absolute",
-                bottom: "80px",
+                bottom: "85px",
                 left: "50%",
                 transform: "translateX(-50%)",
                 backgroundColor: "var(--bg-surface)",
+                backdropFilter: "var(--blur-md)",
                 border: "1px solid var(--border)",
-                borderRadius: "16px",
+                borderRadius: "20px",
                 padding: "0.5rem",
                 display: "flex",
                 flexDirection: "column",
                 gap: "0.5rem",
-                width: "200px",
-                boxShadow: "0 10px 25px rgba(0,0,0,0.5)"
+                width: "220px",
+                boxShadow: "0 10px 40px rgba(0,0,0,0.8)"
               }}
             >
               <button 
                 onClick={() => triggerScan("meal")}
-                style={{ padding: "0.8rem", background: "none", border: "none", color: "white", textAlign: "left", borderRadius: "8px", cursor: "pointer", display: "flex", alignItems: "center", gap: "0.5rem" }}
+                style={{ padding: "1rem", background: "rgba(255,255,255,0.03)", border: "1px solid var(--border)", color: "white", textAlign: "left", borderRadius: "12px", cursor: "pointer", display: "flex", alignItems: "center", gap: "0.8rem", transition: "all 0.2s" }}
+                onMouseEnter={(e) => e.currentTarget.style.background = "rgba(255,255,255,0.08)"}
+                onMouseLeave={(e) => e.currentTarget.style.background = "rgba(255,255,255,0.03)"}
               >
-                📸 Escanear Platillo
+                <Camera size={20} color="var(--primary)" />
+                <span style={{ fontFamily: "var(--font-sans)", fontWeight: 500, fontSize: "0.9rem" }}>Escanear Platillo</span>
               </button>
-              <div style={{ height: "1px", backgroundColor: "var(--border)" }} />
               <button 
                 onClick={() => triggerScan("label")}
-                style={{ padding: "0.8rem", background: "none", border: "none", color: "white", textAlign: "left", borderRadius: "8px", cursor: "pointer", display: "flex", alignItems: "center", gap: "0.5rem" }}
+                style={{ padding: "1rem", background: "rgba(255,255,255,0.03)", border: "1px solid var(--border)", color: "white", textAlign: "left", borderRadius: "12px", cursor: "pointer", display: "flex", alignItems: "center", gap: "0.8rem", transition: "all 0.2s" }}
+                onMouseEnter={(e) => e.currentTarget.style.background = "rgba(255,255,255,0.08)"}
+                onMouseLeave={(e) => e.currentTarget.style.background = "rgba(255,255,255,0.03)"}
               >
-                🏷️ Etiqueta Nutricional
+                <ScanBarcode size={20} color="var(--primary)" />
+                <span style={{ fontFamily: "var(--font-sans)", fontWeight: 500, fontSize: "0.9rem" }}>Etiqueta Nutricional</span>
               </button>
             </motion.div>
           )}
@@ -137,13 +145,13 @@ export const FloatingScanner = () => {
             borderRadius: "50%", 
             border: "2px solid var(--primary)",
             display: "flex", alignItems: "center", justifyContent: "center",
-            boxShadow: "0 0 20px rgba(255, 69, 0, 0.5)", 
+            boxShadow: "0 0 20px var(--primary-glow)", 
             cursor: "pointer",
-            transition: "all 0.3s"
+            transition: "all 0.3s cubic-bezier(0.16, 1, 0.3, 1)"
           }}
         >
           {showMenu ? (
-            <span style={{ fontSize: "1.5rem", color: "var(--primary)" }}>✖️</span>
+            <X size={28} color="var(--primary)" />
           ) : (
             <img 
               src="/logo_transparent.png" 
