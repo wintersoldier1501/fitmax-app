@@ -8,7 +8,7 @@ import Link from "next/link";
 import { Camera, Edit2, Settings, Lock, ChevronRight, User } from "lucide-react";
 
 export default function Profile() {
-  const { isLoaded, profile, biometrics, xp, activeTheme, updateAvatar, updateName, setProfileAndCalculate, saveTheme } = useFitmax();
+  const { isLoaded, profile, biometrics, xp, activeTheme, updateAvatar, updateName, setProfileAndCalculate, saveTheme, user, loginWithGoogle, logout } = useFitmax();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [isEditingName, setIsEditingName] = useState(false);
@@ -284,6 +284,47 @@ export default function Profile() {
             <span style={{ fontSize: "0.9rem", fontWeight: "bold", color: "white" }}>Cyberpunk</span>
             {xp < 800 && <div style={{ fontSize: "0.7rem", color: "var(--text-muted)", marginTop: "0.4rem", display: "flex", alignItems: "center", justifyContent: "center", gap: "4px" }}><Lock size={12} /> 800 XP</div>}
           </div>
+        </div>
+      </section>
+
+      <section style={{ marginBottom: "2rem", marginTop: "2rem" }}>
+        <h3 style={{ fontSize: "1.2rem", color: "white", marginBottom: "1rem", display: "flex", alignItems: "center", gap: "0.5rem" }}>
+          Sincronización en la Nube
+        </h3>
+        <div className="glass-card" style={{ padding: "1.5rem", display: "flex", flexDirection: "column", gap: "1rem" }}>
+          {user ? (
+            <>
+              <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
+                <img src={user.photoURL || ""} alt="Google Avatar" style={{ width: "40px", height: "40px", borderRadius: "50%" }} />
+                <div>
+                  <p style={{ color: "white", fontWeight: "bold", margin: 0 }}>{user.displayName}</p>
+                  <p style={{ color: "var(--text-muted)", fontSize: "0.8rem", margin: 0 }}>{user.email}</p>
+                </div>
+              </div>
+              <p style={{ fontSize: "0.85rem", color: "#00E5FF", margin: 0 }}>
+                Tus datos están respaldados en la nube y sincronizados en tiempo real.
+              </p>
+              <button 
+                onClick={logout}
+                style={{ background: "rgba(255,255,255,0.1)", border: "none", color: "white", padding: "0.8rem", borderRadius: "8px", fontWeight: "bold", cursor: "pointer", marginTop: "0.5rem" }}
+              >
+                Cerrar Sesión
+              </button>
+            </>
+          ) : (
+            <>
+              <p style={{ fontSize: "0.9rem", color: "var(--text-muted)", margin: 0 }}>
+                Inicia sesión con tu cuenta de Google para guardar tus macros, comidas y progreso en la nube y acceder desde cualquier dispositivo.
+              </p>
+              <button 
+                onClick={loginWithGoogle}
+                style={{ background: "white", border: "none", color: "black", padding: "1rem", borderRadius: "8px", fontWeight: "bold", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "0.5rem", marginTop: "0.5rem" }}
+              >
+                <svg width="18" height="18" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.611,20.083H42V20H24v8h11.303c-1.649,4.657-6.08,8-11.303,8c-6.627,0-12-5.373-12-12c0-6.627,5.373-12,12-12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C12.955,4,4,12.955,4,24c0,11.045,8.955,20,20,20c11.045,0,20-8.955,20-20C44,22.659,43.862,21.35,43.611,20.083z"/><path fill="#FF3D00" d="M6.306,14.691l6.571,4.819C14.655,15.108,18.961,12,24,12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C16.318,4,9.656,8.337,6.306,14.691z"/><path fill="#4CAF50" d="M24,44c5.166,0,9.86-1.977,13.409-5.192l-6.19-5.238C29.211,35.091,26.715,36,24,36c-5.202,0-9.619-3.317-11.283-7.946l-6.522,5.025C9.505,39.556,16.227,44,24,44z"/><path fill="#1976D2" d="M43.611,20.083H42V20H24v8h11.303c-0.792,2.237-2.231,4.166-4.087,5.571c0.001-0.001,0.002-0.001,0.003-0.002l6.19,5.238C36.971,39.205,44,34,44,24C44,22.659,43.862,21.35,43.611,20.083z"/></svg>
+                Continuar con Google
+              </button>
+            </>
+          )}
         </div>
       </section>
 

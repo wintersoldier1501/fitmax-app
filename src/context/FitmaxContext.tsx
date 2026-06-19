@@ -1,6 +1,9 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import React, { createContext, useContext, useState, useEffect, ReactNode, useRef } from "react";
+import { auth, db, googleProvider } from "@/lib/firebase";
+import { onAuthStateChanged, signInWithPopup, signOut, User } from "firebase/auth";
+import { doc, getDoc, setDoc } from "firebase/firestore";
 
 type Goal = "Perder Grasa" | "Recomposición Corporal" | "Subir de Peso Limpio";
 type Activity = "Sedentario" | "Ligero" | "Moderado" | "Intenso";
@@ -59,6 +62,9 @@ interface FitmaxState {
   customDiet: any;
   saveDiet: (diet: any) => void;
   resetProgress: () => void; // For testing or new day
+  user: User | null;
+  loginWithGoogle: () => Promise<void>;
+  logout: () => Promise<void>;
 }
 
 const defaultProfile: UserProfile = {
@@ -80,6 +86,8 @@ export const FitmaxProvider = ({ children }: { children: ReactNode }) => {
   const [bodyFat, setBodyFat] = useState<number | null>(null);
   const [biometrics, setBiometrics] = useState<Biometrics>({ bodyFatPercentage: null, leanMass: null });
   const [activeTheme, setActiveTheme] = useState("light");
+  const [user, setUser] = useState<User | null>(null);
+  const isCloudLoaded = useRef(false);
 
   // Load from localStorage on mount
   useEffect(() => {
@@ -109,6 +117,51 @@ export const FitmaxProvider = ({ children }: { children: ReactNode }) => {
     setIsLoaded(true);
   }, []);
 
+  // Handle Firebase Auth and Cloud Sync
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      setUser(currentUser);
+      if (currentUser) {
+        // Fetch cloud data
+        const docRef = doc(db, "users", currentUser.uid);
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          if (data.profile) setProfile(data.profile);
+          if (data.targetMacros) setTargetMacros(data.targetMacros);
+          if (data.currentMacros) setCurrentMacros(data.currentMacros);
+          if (data.loggedFoods) setLoggedFoods(data.loggedFoods);
+          if (data.customDiet) setCustomDiet(data.customDiet);
+          if (data.xp !== undefined) setXp(data.xp);
+          if (data.streak !== undefined) setStreak(data.streak);
+          if (data.biometrics) setBiometrics(data.biometrics);
+          if (data.activeTheme) {
+            setActiveTheme(data.activeTheme);
+            document.documentElement.setAttribute('data-theme', data.activeTheme);
+          }
+        }
+        isCloudLoaded.current = true;
+      } else {
+        isCloudLoaded.current = false;
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
+  const loginWithGoogle = async () => {
+    try {
+      await signInWithPopup(auth, googleProvider);
+    } catch (error) {
+      console.error("Google login failed", error);
+    }
+  };
+
+  const logout = async () => {
+    await signOut(auth);
+    // Optional: clear local state or reload
+    window.location.reload();
+  };
+
   // Save to localStorage when state changes (only after initial load)
   useEffect(() => {
     if (isLoaded) {
@@ -121,8 +174,15 @@ export const FitmaxProvider = ({ children }: { children: ReactNode }) => {
       localStorage.setItem("fitmax_streak", streak.toString());
       localStorage.setItem("fitmax_biometrics", JSON.stringify(biometrics));
       localStorage.setItem("fitmax_theme", activeTheme);
+      
+      // Sync to cloud if user is logged in and cloud is loaded
+      if (user && isCloudLoaded.current) {
+        setDoc(doc(db, "users", user.uid), {
+          profile, targetMacros, currentMacros, loggedFoods, customDiet, xp, streak, biometrics, activeTheme
+        }, { merge: true });
+      }
     }
-  }, [profile, targetMacros, currentMacros, loggedFoods, customDiet, xp, streak, biometrics, activeTheme, isLoaded]);
+  }, [profile, targetMacros, currentMacros, loggedFoods, customDiet, xp, streak, biometrics, activeTheme, isLoaded, user]);
 
   const saveTheme = (theme: string) => {
     setActiveTheme(theme);
@@ -216,7 +276,7 @@ export const FitmaxProvider = ({ children }: { children: ReactNode }) => {
   };
 
   return (
-    <FitmaxContext.Provider value={{ isLoaded, profile, targetMacros, currentMacros, loggedFoods, biometrics, activeTheme, xp, streak, setProfileAndCalculate, updateAvatar, updateName, addFoodLog, addXp, saveTheme, customDiet, saveDiet, resetProgress }}>
+    <FitmaxContext.Provider value={{ isLoaded, profile, targetMacros, currentMacros, loggedFoods, biometrics, activeTheme, xp, streak, setProfileAndCalculate, updateAvatar, updateName, addFoodLog, addXp, saveTheme, customDiet, saveDiet, resetProgress, user, loginWithGoogle, logout }}>
       {children}
     </FitmaxContext.Provider>
   );
