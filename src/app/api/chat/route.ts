@@ -39,6 +39,14 @@ Reglas:
       parts: [{ text: msg.text }]
     }));
 
+    // Gemini API requires the first message in history to be from 'user'.
+    if (history.length > 0 && history[0].role === "model") {
+      history.unshift({
+        role: "user",
+        parts: [{ text: "Hola Coach, necesito tu ayuda." }]
+      });
+    }
+
     const chat = model.startChat({
       history: history
     });
