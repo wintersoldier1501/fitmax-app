@@ -17,34 +17,86 @@ export const FloatingScanner = () => {
 
   const handleCapture = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
       setIsScanning(true);
       
-        // Simulate AI Processing delay
-      setTimeout(() => {
-        setIsScanning(false);
-        const isLabel = scanMode === "label";
-        
-        setScannedFood({
-          id: Date.now().toString(),
-          name: isLabel ? "Producto Procesado (1 Porción)" : "Pechuga de Pollo con Arroz y Brócoli",
-          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          macros: isLabel 
-            ? { protein: 12, carbs: 35, fats: 8, calories: 260 }
-            : {
-                protein: Math.round(targetMacros.protein * 0.3) || 45,
-                carbs: Math.round(targetMacros.carbs * 0.25) || 50,
-                fats: Math.round(targetMacros.fats * 0.2) || 12,
-                calories: 488,
-              }
-        });
-        setShowConfirm(true);
-      }, 3000);
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const img = new Image();
+        img.onload = async () => {
+          // Compress image using canvas
+          const canvas = document.createElement("canvas");
+          const MAX_WIDTH = 800;
+          const MAX_HEIGHT = 800;
+          let width = img.width;
+          let height = img.height;
+
+          if (width > height) {
+            if (width > MAX_WIDTH) {
+              height *= MAX_WIDTH / width;
+              width = MAX_WIDTH;
+            }
+          } else {
+            if (height > MAX_HEIGHT) {
+              width *= MAX_HEIGHT / height;
+              height = MAX_HEIGHT;
+            }
+          }
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext("2d");
+          ctx?.drawImage(img, 0, 0, width, height);
+          const base64Image = canvas.toDataURL("image/jpeg", 0.7); // 70% quality
+
+          try {
+            const res = await fetch("/api/vision", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ image: base64Image })
+            });
+            const data = await res.json();
+
+            if (data.error) {
+              alert(data.error);
+              setIsScanning(false);
+              return;
+            }
+
+            setScannedFood({
+              id: Date.now().toString(),
+              name: data.name || "Comida Escaneada",
+              time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+              macros: {
+                protein: Number(data.protein) || 0,
+                carbs: Number(data.carbs) || 0,
+                fats: Number(data.fats) || 0,
+                calories: Number(data.calories) || 0,
+              },
+              image: base64Image
+            });
+            setShowConfirm(true);
+          } catch (error) {
+            alert("Error analizando la imagen. Revisa tu conexión o tu API Key.");
+          } finally {
+            setIsScanning(false);
+          }
+        };
+        img.src = event.target?.result as string;
+      };
+      reader.readAsDataURL(file);
     }
   };
 
   const confirmLog = () => {
     if (scannedFood) {
-      addFoodLog(scannedFood);
+      const recalculatedCalories = (scannedFood.macros.protein * 4) + (scannedFood.macros.carbs * 4) + (scannedFood.macros.fats * 9);
+      addFoodLog({
+        ...scannedFood,
+        macros: {
+          ...scannedFood.macros,
+          calories: recalculatedCalories
+        }
+      });
     }
     setShowConfirm(false);
     setScannedFood(null);
@@ -204,13 +256,51 @@ export const FloatingScanner = () => {
                 initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }}
                 style={{ backgroundColor: "var(--bg-surface)", padding: "2rem", borderRadius: "20px", width: "100%", maxWidth: "400px", textAlign: "center" }}
               >
-                <h2 style={{ marginBottom: "0.5rem", color: "var(--primary)" }}>Visión IA Completada</h2>
-                <p style={{ fontSize: "1.2rem", fontWeight: 700, marginBottom: "1.5rem" }}>{scannedFood.name}</p>
+                <h2 style={{ marginBottom: "0.5rem", color: "var(--primary)" }}>IA Completada</h2>
+                <input 
+                  type="text" 
+                  value={scannedFood.name} 
+                  onChange={(e) => setScannedFood({...scannedFood, name: e.target.value})}
+                  style={{ width: "100%", background: "transparent", border: "none", borderBottom: "1px solid var(--primary)", color: "white", textAlign: "center", fontSize: "1.2rem", fontWeight: 700, marginBottom: "1.5rem", padding: "0.5rem", outline: "none" }}
+                />
                 
                 <div style={{ display: "flex", justifyContent: "space-around", marginBottom: "2rem" }}>
-                  <div><p style={{ color: "var(--text-muted)", fontSize: "0.8rem", textTransform: "uppercase" }}>Proteína</p><p style={{ fontWeight: 800 }}>{scannedFood.macros.protein}g</p></div>
-                  <div><p style={{ color: "var(--text-muted)", fontSize: "0.8rem", textTransform: "uppercase" }}>Carbos</p><p style={{ fontWeight: 800 }}>{scannedFood.macros.carbs}g</p></div>
-                  <div><p style={{ color: "var(--text-muted)", fontSize: "0.8rem", textTransform: "uppercase" }}>Grasas</p><p style={{ fontWeight: 800 }}>{scannedFood.macros.fats}g</p></div>
+                  <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+                    <p style={{ color: "var(--text-muted)", fontSize: "0.8rem", textTransform: "uppercase" }}>Proteína</p>
+                    <div style={{ display: "flex", alignItems: "center" }}>
+                      <input 
+                        type="number" 
+                        value={scannedFood.macros.protein} 
+                        onChange={(e) => setScannedFood({...scannedFood, macros: {...scannedFood.macros, protein: Number(e.target.value)}})}
+                        style={{ width: "50px", background: "transparent", border: "1px solid var(--border)", color: "white", textAlign: "center", borderRadius: "5px", fontWeight: 800, fontSize: "1rem" }}
+                      />
+                      <span style={{ marginLeft: "2px" }}>g</span>
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+                    <p style={{ color: "var(--text-muted)", fontSize: "0.8rem", textTransform: "uppercase" }}>Carbos</p>
+                    <div style={{ display: "flex", alignItems: "center" }}>
+                      <input 
+                        type="number" 
+                        value={scannedFood.macros.carbs} 
+                        onChange={(e) => setScannedFood({...scannedFood, macros: {...scannedFood.macros, carbs: Number(e.target.value)}})}
+                        style={{ width: "50px", background: "transparent", border: "1px solid var(--border)", color: "white", textAlign: "center", borderRadius: "5px", fontWeight: 800, fontSize: "1rem" }}
+                      />
+                      <span style={{ marginLeft: "2px" }}>g</span>
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+                    <p style={{ color: "var(--text-muted)", fontSize: "0.8rem", textTransform: "uppercase" }}>Grasas</p>
+                    <div style={{ display: "flex", alignItems: "center" }}>
+                      <input 
+                        type="number" 
+                        value={scannedFood.macros.fats} 
+                        onChange={(e) => setScannedFood({...scannedFood, macros: {...scannedFood.macros, fats: Number(e.target.value)}})}
+                        style={{ width: "50px", background: "transparent", border: "1px solid var(--border)", color: "white", textAlign: "center", borderRadius: "5px", fontWeight: 800, fontSize: "1rem" }}
+                      />
+                      <span style={{ marginLeft: "2px" }}>g</span>
+                    </div>
+                  </div>
                 </div>
 
                 <div style={{ display: "flex", gap: "1rem" }}>
