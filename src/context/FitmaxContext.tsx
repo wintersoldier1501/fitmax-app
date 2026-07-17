@@ -295,7 +295,7 @@ export const FitmaxProvider = ({ children }: { children: ReactNode }) => {
   };
 
   return (
-    <FitmaxContext.Provider value={{ isLoaded, profile, targetMacros, currentMacros, loggedFoods, biometrics, activeTheme, xp, streak, setProfileAndCalculate, updateAvatar, updateName, addFoodLog, addXp, saveTheme, customDiet, saveDiet, resetProgress, user, loginWithGoogle, logout }}>
+    <FitmaxContext.Provider value={{ isLoaded, profile, targetMacros, currentMacros, loggedFoods, biometrics, activeTheme, xp, streak, setProfileAndCalculate, updateAvatar, updateName, addFoodLog, addXp, saveTheme, customDiet, saveDiet, resetProgress, user, loginWithGoogle, logout, lastResetDate }}>
       {children}
     </FitmaxContext.Provider>
   );
