@@ -59,6 +59,6 @@ Reglas:
     return NextResponse.json({ response: text });
   } catch (error: any) {
     console.error("Chat API Error:", error);
-    return NextResponse.json({ error: "Failed to generate response" }, { status: 500 });
+    return NextResponse.json({ error: error.message || "Failed to generate response" }, { status: 500 });
   }
 }
