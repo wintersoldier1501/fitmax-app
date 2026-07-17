@@ -59,6 +59,6 @@ Si la imagen no parece comida, intenta adivinar o devuelve valores en 0, pero si
     return NextResponse.json(parsedData);
   } catch (error: any) {
     console.error("Vision API Error:", error);
-    return NextResponse.json({ error: "Failed to process image" }, { status: 500 });
+    return NextResponse.json({ error: error.message || "Failed to process image" }, { status: 500 });
   }
 }
