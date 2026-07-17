@@ -1,10 +1,32 @@
 "use client";
 
 import { motion, AnimatePresence } from "framer-motion";
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useFitmax } from "@/context/FitmaxContext";
 
 import { Camera, ScanBarcode, X } from "lucide-react";
+
+import { Html5QrcodeScanner } from "html5-qrcode";
+
+const BarcodeScannerComponent = ({ onScanSuccess, onScanError }: any) => {
+  useEffect(() => {
+    const scanner = new Html5QrcodeScanner("reader", { 
+      qrbox: { width: 250, height: 150 }, 
+      fps: 5,
+    }, false);
+
+    scanner.render((decodedText) => {
+      scanner.clear();
+      onScanSuccess(decodedText);
+    }, onScanError);
+
+    return () => {
+      scanner.clear().catch(e => console.error("Failed to clear scanner", e));
+    };
+  }, []);
+
+  return <div id="reader" style={{ width: "100%", maxWidth: "400px", margin: "0 auto", borderRadius: "15px", overflow: "hidden" }}></div>;
+};
 
 export const FloatingScanner = () => {
   const { addFoodLog, targetMacros } = useFitmax();
@@ -13,6 +35,7 @@ export const FloatingScanner = () => {
   const [scannedFood, setScannedFood] = useState<any>(null);
   const [showMenu, setShowMenu] = useState(false);
   const [scanMode, setScanMode] = useState<"meal" | "label">("meal");
+  const [showLiveScanner, setShowLiveScanner] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleCapture = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -102,10 +125,43 @@ export const FloatingScanner = () => {
     setScannedFood(null);
   };
 
+  const handleBarcodeSuccess = async (decodedText: string) => {
+    setShowLiveScanner(false);
+    setIsScanning(true);
+    try {
+      const res = await fetch(`/api/barcode?code=${decodedText}`);
+      const data = await res.json();
+      
+      if (data.error) {
+        alert(data.error);
+        setIsScanning(false);
+        return;
+      }
+
+      const p = data.results;
+      setScannedFood({
+        id: Date.now().toString(),
+        name: p.name,
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        macros: p.macros,
+        image: p.image
+      });
+      setShowConfirm(true);
+    } catch (e) {
+      alert("Error de conexión al buscar el código de barras.");
+    } finally {
+      setIsScanning(false);
+    }
+  };
+
   const triggerScan = (mode: "meal" | "label") => {
     setScanMode(mode);
     setShowMenu(false);
-    fileInputRef.current?.click();
+    if (mode === "label") {
+      setShowLiveScanner(true);
+    } else {
+      fileInputRef.current?.click();
+    }
   };
 
   return (
@@ -225,6 +281,32 @@ export const FloatingScanner = () => {
 
       {/* Fullscreen Overlay for Scanning and Confirmation */}
       <AnimatePresence>
+        {showLiveScanner && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            style={{
+              position: "fixed", top: 0, left: 0, width: "100vw", height: "100vh",
+              backgroundColor: "var(--bg-surface)", zIndex: 9999,
+              display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+              padding: "2rem", color: "white"
+            }}
+          >
+            <h2 style={{ marginBottom: "1rem", color: "var(--primary)" }}>Escanea el Código</h2>
+            <BarcodeScannerComponent 
+              onScanSuccess={handleBarcodeSuccess} 
+              onScanError={() => {}} 
+            />
+            <button 
+              onClick={() => setShowLiveScanner(false)} 
+              style={{ marginTop: "2rem", padding: "1rem 2rem", backgroundColor: "transparent", border: "1px solid var(--text-muted)", color: "white", borderRadius: "10px", cursor: "pointer" }}
+            >
+              Cancelar
+            </button>
+          </motion.div>
+        )}
+
         {(isScanning || showConfirm) && (
           <motion.div
             initial={{ opacity: 0 }}
