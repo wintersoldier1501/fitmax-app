@@ -65,6 +65,7 @@ interface FitmaxState {
   user: User | null;
   loginWithGoogle: () => Promise<void>;
   logout: () => Promise<void>;
+  lastResetDate: string;
 }
 
 const defaultProfile: UserProfile = {
@@ -87,6 +88,7 @@ export const FitmaxProvider = ({ children }: { children: ReactNode }) => {
   const [biometrics, setBiometrics] = useState<Biometrics>({ bodyFatPercentage: null, leanMass: null });
   const [activeTheme, setActiveTheme] = useState("light");
   const [user, setUser] = useState<User | null>(null);
+  const [lastResetDate, setLastResetDate] = useState(new Date().toDateString());
   const isCloudLoaded = useRef(false);
 
   // Load from localStorage on mount
@@ -100,11 +102,12 @@ export const FitmaxProvider = ({ children }: { children: ReactNode }) => {
     const savedStreak = localStorage.getItem("fitmax_streak");
     const savedBiometrics = localStorage.getItem("fitmax_biometrics");
     const savedTheme = localStorage.getItem("fitmax_theme");
+    const savedResetDate = localStorage.getItem("fitmax_lastResetDate");
+
+    const today = new Date().toDateString();
 
     if (savedProfile) setProfile(JSON.parse(savedProfile));
     if (savedTarget) setTargetMacros(JSON.parse(savedTarget));
-    if (savedCurrent) setCurrentMacros(JSON.parse(savedCurrent));
-    if (savedLogs) setLoggedFoods(JSON.parse(savedLogs));
     if (savedDiet) setCustomDiet(JSON.parse(savedDiet));
     if (savedXp) setXp(Number(savedXp));
     if (savedStreak) setStreak(Number(savedStreak));
@@ -112,6 +115,19 @@ export const FitmaxProvider = ({ children }: { children: ReactNode }) => {
     if (savedTheme) {
       setActiveTheme(savedTheme);
       document.documentElement.setAttribute('data-theme', savedTheme);
+    }
+    
+    // Check if a new day has started
+    if (savedResetDate && savedResetDate !== today) {
+      // It's a new day! Reset macros and logs.
+      setCurrentMacros(defaultMacros);
+      setLoggedFoods([]);
+      setLastResetDate(today);
+    } else {
+      // Same day, load current progress
+      if (savedCurrent) setCurrentMacros(JSON.parse(savedCurrent));
+      if (savedLogs) setLoggedFoods(JSON.parse(savedLogs));
+      if (savedResetDate) setLastResetDate(savedResetDate);
     }
     
     setIsLoaded(true);
@@ -135,6 +151,7 @@ export const FitmaxProvider = ({ children }: { children: ReactNode }) => {
           if (data.xp !== undefined) setXp(data.xp);
           if (data.streak !== undefined) setStreak(data.streak);
           if (data.biometrics) setBiometrics(data.biometrics);
+          if (data.lastResetDate) setLastResetDate(data.lastResetDate);
           if (data.activeTheme) {
             setActiveTheme(data.activeTheme);
             document.documentElement.setAttribute('data-theme', data.activeTheme);
@@ -175,15 +192,16 @@ export const FitmaxProvider = ({ children }: { children: ReactNode }) => {
       localStorage.setItem("fitmax_streak", streak.toString());
       localStorage.setItem("fitmax_biometrics", JSON.stringify(biometrics));
       localStorage.setItem("fitmax_theme", activeTheme);
+      localStorage.setItem("fitmax_lastResetDate", lastResetDate);
       
       // Sync to cloud if user is logged in and cloud is loaded
       if (user && isCloudLoaded.current) {
         setDoc(doc(db, "users", user.uid), {
-          profile, targetMacros, currentMacros, loggedFoods, customDiet, xp, streak, biometrics, activeTheme
+          profile, targetMacros, currentMacros, loggedFoods, customDiet, xp, streak, biometrics, activeTheme, lastResetDate
         }, { merge: true });
       }
     }
-  }, [profile, targetMacros, currentMacros, loggedFoods, customDiet, xp, streak, biometrics, activeTheme, isLoaded, user]);
+  }, [profile, targetMacros, currentMacros, loggedFoods, customDiet, xp, streak, biometrics, activeTheme, lastResetDate, isLoaded, user]);
 
   const saveTheme = (theme: string) => {
     setActiveTheme(theme);

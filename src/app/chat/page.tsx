@@ -34,48 +34,47 @@ export default function Chat() {
 
   if (!isLoaded) return null;
 
-  const handleSend = () => {
+  const handleSend = async () => {
     if (!inputValue.trim()) return;
 
-    const userMessage: Message = { id: Date.now().toString(), sender: "user", text: inputValue };
-    setMessages(prev => [...prev, userMessage]);
+    const userText = inputValue;
+    const userMessage: Message = { id: Date.now().toString(), sender: "user", text: userText };
+    const newMessages = [...messages, userMessage];
+    setMessages(newMessages);
     setInputValue("");
     setIsTyping(true);
 
-    // Simulate AI thinking and generating a response based on context
-    setTimeout(() => {
-      const responseText = generateSimulatedResponse(userMessage.text.toLowerCase());
-      const coachMessage: Message = { id: (Date.now() + 1).toString(), sender: "coach", text: responseText };
+    try {
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: newMessages,
+          profile,
+          currentMacros,
+          targetMacros
+        })
+      });
+
+      const data = await res.json();
+      
+      const coachMessage: Message = { 
+        id: (Date.now() + 1).toString(), 
+        sender: "coach", 
+        text: data.response || "Hubo un error al procesar mi respuesta." 
+      };
       
       setMessages(prev => [...prev, coachMessage]);
+    } catch (error) {
+      const errorMessage: Message = { 
+        id: (Date.now() + 1).toString(), 
+        sender: "coach", 
+        text: "Error de conexión. Revisa tu internet e intenta de nuevo." 
+      };
+      setMessages(prev => [...prev, errorMessage]);
+    } finally {
       setIsTyping(false);
-    }, 2000);
-  };
-
-  const generateSimulatedResponse = (text: string) => {
-    if (text.includes("proteina") || text.includes("proteína") || text.includes("falta")) {
-      const remainingProtein = targetMacros.protein - currentMacros.protein;
-      if (remainingProtein > 0) {
-        return `Veo en tu registro que te faltan ${remainingProtein}g de proteína para llegar a tu meta hoy. Te recomiendo cenar algo como atún o claras de huevo.`;
-      } else {
-        return "¡Ya cumpliste tu meta de proteína de hoy! Excelente trabajo, tus músculos lo agradecerán.";
-      }
     }
-
-    if (text.includes("calorias") || text.includes("calorías") || text.includes("comido")) {
-      return `Has consumido ${currentMacros.calories} kcal de tu meta de ${targetMacros.calories} kcal. ¡Vas por buen camino!`;
-    }
-
-    if (text.includes("rutina") || text.includes("ejercicio") || text.includes("entrenar")) {
-      if (profile.goal === "Perder Grasa") {
-        return "Para tu objetivo de perder grasa, te sugiero 40 min de pesas intensas seguido de 20 min de cardio LISS (caminar con inclinación). ¿Quieres que te arme la rutina exacta?";
-      } else {
-        return "Para subir limpio, enfócate en hipertrofia. 4 series de 8-10 repeticiones pesadas en ejercicios compuestos (Sentadilla, Press de Banca).";
-      }
-    }
-
-    // Default generic smart response
-    return `¡Entendido, ${profile.name || "Guerrero"}! Recuerda que tu objetivo principal es ${profile.goal}. Sigue registrando tus comidas con el escáner y llegaremos ahí juntos. ¿Tienes alguna otra duda?`;
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
