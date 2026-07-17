@@ -13,8 +13,6 @@ export async function POST(req: Request) {
       }, { status: 200 }); // Return 200 to not break the UI, but tell them to add the key
     }
 
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-
     const systemPrompt = `
 Eres un Coach Nutricional y Deportivo Profesional de Fitmax. Hablas en español, con un tono motivador, directo, científico pero accesible.
 Tu misión principal es ayudar al usuario a alcanzar su meta: ${profile?.goal || "Mejorar su físico"}.
@@ -30,6 +28,11 @@ Reglas:
 4. No uses lenguaje robótico. Eres su coach personal en su bolsillo.
 `;
 
+    const model = genAI.getGenerativeModel({ 
+      model: "gemini-1.5-flash",
+      systemInstruction: systemPrompt 
+    });
+
     // Convert history to Gemini format
     const history = messages.slice(0, -1).map((msg: any) => ({
       role: msg.sender === "user" ? "user" : "model",
@@ -37,8 +40,7 @@ Reglas:
     }));
 
     const chat = model.startChat({
-      history: history,
-      systemInstruction: systemPrompt
+      history: history
     });
 
     const lastMessage = messages[messages.length - 1].text;
