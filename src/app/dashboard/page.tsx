@@ -5,6 +5,7 @@ import { useState } from "react";
 import styles from "./dashboard.module.css";
 import { RankCard } from "@/components/RankCard";
 import { MacroRing } from "@/components/MacroRing";
+import { DailyWisdom } from "@/components/DailyWisdom";
 import { useFitmax } from "@/context/FitmaxContext";
 import Link from "next/link";
 import Image from "next/image";
@@ -75,6 +76,16 @@ export default function Dashboard() {
           streak={streak} 
         />
       </section>
+
+      {/* Daily Wisdom & Stoic Reflection */}
+      <motion.section
+        initial={{ opacity: 0, y: 15 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, delay: 0.25 }}
+        style={{ marginTop: "1.2rem" }}
+      >
+        <DailyWisdom />
+      </motion.section>
 
       {/* Daily Macros Rings */}
       <motion.section

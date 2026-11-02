@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import styles from "./workout.module.css";
 import { useFitmax } from "@/context/FitmaxContext";
 import { useRouter } from "next/navigation";
+import { DailyWisdom } from "@/components/DailyWisdom";
 import { 
   Sparkles, 
   Wand2, 
@@ -451,6 +452,9 @@ export default function Workout() {
           </div>
         </div>
       )}
+
+      {/* Mental Focus & Stoic Primer */}
+      <DailyWisdom compact />
 
       {/* Active Workout Card */}
       <div className={styles.workoutCard}>

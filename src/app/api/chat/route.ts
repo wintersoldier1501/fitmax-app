@@ -33,6 +33,22 @@ function generateCoachFallback(
     return `¡Excelente registro, ${name}! Si acabas de comer eso, recuerda usar el botón del Escáner central (+) o el buscador en la pestaña Diario para sumarlo con exactitud a tus anillos. Recuerda que aún te quedan ~${calRemaining} kcal y ${pDiff}g de proteína para completar tu requerimiento de hoy. ¡Mantente constante!`;
   }
 
+  // Motivational / Stoic discipline queries
+  if (
+    msg.includes("motiva") || msg.includes("frase") || msg.includes("pereza") || 
+    msg.includes("desgana") || msg.includes("flojera") || msg.includes("rendir") || 
+    msg.includes("anim") || msg.includes("ánimo") || msg.includes("disciplina") ||
+    msg.includes("reflexion") || msg.includes("reflexión")
+  ) {
+    return `Escucha esto, ${name}:
+
+*"El dolor de la disciplina pesa gramos; el dolor del arrepentimiento pesa toneladas."* — Jim Rohn
+
+La motivación es una emoción barata y pasajera que solo dura los primeros 5 minutos; la verdadera disciplina es la decisión de levantarte y hacer lo que te prometiste incluso cuando cada célula de tu cuerpo busca la comodidad del sillón.
+
+No entrenas para el cuerpo que tienes hoy, entrenas para ganarte el respeto propio de la persona en la que te estás convirtiendo. Ponte la ropa, agarra tu agua y da el primer paso. El 80% de la batalla se gana simplemente presentándote a entrenar. ¡Vamos a darle! 🔥`;
+  }
+
   // Specific Workout / Chest & Bodybuilding queries
   if (msg.includes("pecho")) {
     return `Para tu sesión de pecho en ${goal}:
@@ -96,6 +112,7 @@ Directrices de conversación:
 2. Responde directamente y con profundidad a lo que el usuario pregunte. Si te pregunta sobre qué ejercicios hacer de pecho, cuántas series, cómo manejar la velocidad de bajada (tensión mecánica) y si ir o no al fallo, DESGLÓSALE exactamente cada punto con ejemplos prácticos y fundamentos científicos.
 3. Si te preguntan sobre marcas de proteína, recetas con lo que tienen en la cocina, o cómo entrenar con poco tiempo, dales soluciones claras paso a paso.
 4. Mantén tus respuestas fáciles de leer en un celular, usando viñetas claras y negritas.
+5. Si el usuario te pide frases motivacionales, reflexiones o expresa pereza/desgana: NUNCA uses clichés vacíos ('¡Tú puedes!', 'No pain no gain'). Bríndale reflexiones estoicas profundas y contundentes (inspiradas en Marco Aurelio, Séneca, Epicteto, David Goggins o Alex Hormozi), enfocadas en el respeto propio, la identidad del guerrero y el dominio de la disciplina sobre el impulso momentáneo.
 `;
 
     let responseText: string | null = null;
