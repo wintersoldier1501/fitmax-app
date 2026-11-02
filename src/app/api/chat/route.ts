@@ -100,6 +100,12 @@ Reglas:
       });
     }
 
+    const withTimeout = <T>(promise: Promise<T>, ms: number): Promise<T> =>
+      Promise.race([
+        promise,
+        new Promise<T>((_, reject) => setTimeout(() => reject(new Error("Timeout")), ms))
+      ]);
+
     for (const modelName of modelsToTry) {
       try {
         const model = genAI.getGenerativeModel({ 
@@ -111,13 +117,13 @@ Reglas:
           history: history
         });
 
-        const result = await chat.sendMessage(lastMessage || "Hola");
+        const result = await withTimeout(chat.sendMessage(lastMessage || "Hola"), 4500);
         const response = await result.response;
         responseText = response.text();
         if (responseText) break;
       } catch (err: any) {
         lastApiError = err;
-        console.warn(`Gemini model ${modelName} failed:`, err?.message);
+        console.warn(`Gemini model ${modelName} failed or timed out:`, err?.message);
       }
     }
 

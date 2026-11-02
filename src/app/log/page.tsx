@@ -4,10 +4,10 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useState } from "react";
 import styles from "./log.module.css";
 import { useFitmax, FoodLog } from "@/context/FitmaxContext";
-import { Search, Loader2 } from "lucide-react";
+import { Search, Loader2, Trash2 } from "lucide-react";
 
 export default function DiaryLog() {
-  const { isLoaded, loggedFoods, resetProgress, addFoodLog } = useFitmax();
+  const { isLoaded, loggedFoods, resetProgress, addFoodLog, removeFoodLog } = useFitmax();
   const [searchQuery, setSearchQuery] = useState("");
   const [isSearching, setIsSearching] = useState(false);
   const [searchResults, setSearchResults] = useState<any[]>([]);
@@ -196,8 +196,33 @@ export default function DiaryLog() {
 
               <div className={styles.foodInfo}>
                 <div className={styles.foodHeader}>
-                  <h3 className={styles.foodName}>{food.name}</h3>
-                  <span className={styles.foodTime}>{food.time}</span>
+                  <div style={{ display: "flex", flexDirection: "column" }}>
+                    <h3 className={styles.foodName}>{food.name}</h3>
+                    <span className={styles.foodTime}>{food.time}</span>
+                  </div>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (confirm(`¿Eliminar "${food.name}" de tus registros?`)) {
+                        removeFoodLog(food.id);
+                      }
+                    }}
+                    style={{
+                      background: "rgba(255, 51, 102, 0.12)",
+                      border: "1px solid rgba(255, 51, 102, 0.25)",
+                      color: "var(--primary)",
+                      borderRadius: "8px",
+                      padding: "0.4rem 0.6rem",
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      transition: "all 0.2s"
+                    }}
+                    title="Eliminar comida"
+                  >
+                    <Trash2 size={16} />
+                  </button>
                 </div>
                 
                 <div className={styles.macrosRow}>

@@ -57,6 +57,10 @@ interface FitmaxState {
   updateAvatar: (base64String: string) => void;
   updateName: (newName: string) => void;
   addFoodLog: (food: FoodLog) => void;
+  removeFoodLog: (id: string) => void;
+  waterGlasses: number;
+  addWater: () => void;
+  removeWater: () => void;
   addXp: (amount: number) => void;
   saveTheme: (theme: string) => void;
   customDiet: any;
@@ -89,6 +93,7 @@ export const FitmaxProvider = ({ children }: { children: ReactNode }) => {
   const [activeTheme, setActiveTheme] = useState("light");
   const [user, setUser] = useState<User | null>(null);
   const [lastResetDate, setLastResetDate] = useState(new Date().toDateString());
+  const [waterGlasses, setWaterGlasses] = useState(0);
   const isCloudLoaded = useRef(false);
 
   // Load from localStorage on mount
@@ -103,6 +108,7 @@ export const FitmaxProvider = ({ children }: { children: ReactNode }) => {
     const savedBiometrics = localStorage.getItem("fitmax_biometrics");
     const savedTheme = localStorage.getItem("fitmax_theme");
     const savedResetDate = localStorage.getItem("fitmax_lastResetDate");
+    const savedWater = localStorage.getItem("fitmax_water");
 
     const today = new Date().toDateString();
 
@@ -123,11 +129,14 @@ export const FitmaxProvider = ({ children }: { children: ReactNode }) => {
       setCurrentMacros(defaultMacros);
       setLoggedFoods([]);
       setLastResetDate(today);
+      setWaterGlasses(0);
+      localStorage.removeItem("fitmax_water");
     } else {
       // Same day, load current progress
       if (savedCurrent) setCurrentMacros(JSON.parse(savedCurrent));
       if (savedLogs) setLoggedFoods(JSON.parse(savedLogs));
       if (savedResetDate) setLastResetDate(savedResetDate);
+      if (savedWater) setWaterGlasses(Number(savedWater));
     }
     
     setIsLoaded(true);
@@ -281,6 +290,36 @@ export const FitmaxProvider = ({ children }: { children: ReactNode }) => {
     setXp(prev => prev + 50);
   };
 
+  const removeFoodLog = (id: string) => {
+    const foodToRemove = loggedFoods.find(f => f.id === id);
+    if (foodToRemove) {
+      setCurrentMacros(prev => ({
+        protein: Math.max(0, prev.protein - foodToRemove.macros.protein),
+        carbs: Math.max(0, prev.carbs - foodToRemove.macros.carbs),
+        fats: Math.max(0, prev.fats - foodToRemove.macros.fats),
+        calories: Math.max(0, prev.calories - foodToRemove.macros.calories)
+      }));
+      setLoggedFoods(prev => prev.filter(f => f.id !== id));
+    }
+  };
+
+  const addWater = () => {
+    setWaterGlasses(prev => {
+      const next = prev + 1;
+      localStorage.setItem("fitmax_water", next.toString());
+      return next;
+    });
+    setXp(prev => prev + 10);
+  };
+
+  const removeWater = () => {
+    setWaterGlasses(prev => {
+      const next = Math.max(0, prev - 1);
+      localStorage.setItem("fitmax_water", next.toString());
+      return next;
+    });
+  };
+
   const addXp = (amount: number) => {
     setXp(prev => prev + amount);
   };
@@ -292,10 +331,12 @@ export const FitmaxProvider = ({ children }: { children: ReactNode }) => {
   const resetProgress = () => {
     setCurrentMacros(defaultMacros);
     setLoggedFoods([]);
+    setWaterGlasses(0);
+    localStorage.removeItem("fitmax_water");
   };
 
   return (
-    <FitmaxContext.Provider value={{ isLoaded, profile, targetMacros, currentMacros, loggedFoods, biometrics, activeTheme, xp, streak, setProfileAndCalculate, updateAvatar, updateName, addFoodLog, addXp, saveTheme, customDiet, saveDiet, resetProgress, user, loginWithGoogle, logout, lastResetDate }}>
+    <FitmaxContext.Provider value={{ isLoaded, profile, targetMacros, currentMacros, loggedFoods, biometrics, activeTheme, xp, streak, setProfileAndCalculate, updateAvatar, updateName, addFoodLog, removeFoodLog, waterGlasses, addWater, removeWater, addXp, saveTheme, customDiet, saveDiet, resetProgress, user, loginWithGoogle, logout, lastResetDate }}>
       {children}
     </FitmaxContext.Provider>
   );
