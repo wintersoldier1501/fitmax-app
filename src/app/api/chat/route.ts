@@ -16,8 +16,8 @@ function generateCoachFallback(
   const cDiff = Math.max(0, (targetMacros?.carbs || 0) - (currentMacros?.carbs || 0));
   const calRemaining = Math.max(0, (targetMacros?.calories || 0) - (currentMacros?.calories || 0));
 
-  // Greetings
-  if (msg.includes("hola") || msg.includes("buen") || msg.includes("hey") || msg.includes("que tal") || msg === "coach") {
+  // Greetings strictly
+  if (msg === "hola" || msg === "buenos dias" || msg === "buenas tardes" || msg === "buenas noches" || msg === "hey" || msg === "que tal" || msg === "coach") {
     return `¡Hola ${name}! Aquí tu Coach Fitmax. Hoy tu meta es ${goal}. Llevas consumidos ${currentMacros?.protein || 0}g de proteína y te faltan ${pDiff}g para cerrar tu meta diaria. ¿Tienes dudas sobre tu rutina o qué comer hoy?`;
   }
 
@@ -98,8 +98,6 @@ Directrices de conversación:
 4. Mantén tus respuestas fáciles de leer en un celular, usando viñetas claras y negritas.
 `;
 
-    // Models verified active in AI Studio
-    const modelsToTry = ["gemini-flash-latest", "gemini-3.7-flash"];
     let responseText: string | null = null;
     let lastApiError: any = null;
 
@@ -122,24 +120,36 @@ Directrices de conversación:
         new Promise<T>((_, reject) => setTimeout(() => reject(new Error("Timeout")), ms))
       ]);
 
-    for (const modelName of modelsToTry) {
+    // Use the official flash model with up to 13.5s timeout for thorough reasoning
+    const model = genAI.getGenerativeModel({ 
+      model: "gemini-flash-latest",
+      systemInstruction: systemPrompt 
+    });
+
+    try {
+      const chat = model.startChat({
+        history: history
+      });
+
+      const result = await withTimeout(chat.sendMessage(lastMessage || "Hola"), 13500);
+      const response = await result.response;
+      responseText = response.text();
+    } catch (err: any) {
+      lastApiError = err;
+      console.warn("Primary Gemini model failed, trying fast fallback:", err?.message);
+      
+      // Fast fallback attempt with gemini-2.5-flash
       try {
-        const model = genAI.getGenerativeModel({ 
-          model: modelName,
+        const fallbackModel = genAI.getGenerativeModel({ 
+          model: "gemini-2.5-flash",
           systemInstruction: systemPrompt 
         });
-
-        const chat = model.startChat({
-          history: history
-        });
-
-        const result = await withTimeout(chat.sendMessage(lastMessage || "Hola"), 7000);
-        const response = await result.response;
-        responseText = response.text();
-        if (responseText) break;
-      } catch (err: any) {
-        lastApiError = err;
-        console.warn(`Gemini model ${modelName} failed or timed out:`, err?.message);
+        const fbChat = fallbackModel.startChat({ history });
+        const fbResult = await withTimeout(fbChat.sendMessage(lastMessage || "Hola"), 4000);
+        const fbResponse = await fbResult.response;
+        responseText = fbResponse.text();
+      } catch (fbErr: any) {
+        console.warn("Secondary model also failed:", fbErr?.message);
       }
     }
 
