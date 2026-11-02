@@ -98,13 +98,8 @@ Directrices de conversación:
 4. Mantén tus respuestas fáciles de leer en un celular, usando viñetas claras y negritas.
 `;
 
-    // Models verified active and available in Google AI Studio
-    const modelsToTry = [
-      "gemini-flash-latest",
-      "gemini-3.7-flash",
-      "gemini-3.5-flash",
-      "gemini-3.8-flash"
-    ];
+    // Models verified active in AI Studio
+    const modelsToTry = ["gemini-flash-latest", "gemini-3.7-flash"];
     let responseText: string | null = null;
     let lastApiError: any = null;
 
@@ -127,36 +122,25 @@ Directrices de conversación:
         new Promise<T>((_, reject) => setTimeout(() => reject(new Error("Timeout")), ms))
       ]);
 
-    const errorsByModel: Record<string, string> = {};
-
     for (const modelName of modelsToTry) {
-      for (let attempt = 1; attempt <= 2; attempt++) {
-        try {
-          const model = genAI.getGenerativeModel({ 
-            model: modelName,
-            systemInstruction: systemPrompt 
-          });
+      try {
+        const model = genAI.getGenerativeModel({ 
+          model: modelName,
+          systemInstruction: systemPrompt 
+        });
 
-          const chat = model.startChat({
-            history: history
-          });
+        const chat = model.startChat({
+          history: history
+        });
 
-          const result = await withTimeout(chat.sendMessage(lastMessage || "Hola"), 12000);
-          const response = await result.response;
-          responseText = response.text();
-          if (responseText) break;
-        } catch (err: any) {
-          errorsByModel[`${modelName}_att${attempt}`] = err?.message || String(err);
-          lastApiError = err;
-          // If 503 (high demand), short pause to let demand spike pass
-          if (err?.message?.includes("503") && attempt === 1) {
-            await new Promise(r => setTimeout(r, 600));
-            continue;
-          }
-          break;
-        }
+        const result = await withTimeout(chat.sendMessage(lastMessage || "Hola"), 7000);
+        const response = await result.response;
+        responseText = response.text();
+        if (responseText) break;
+      } catch (err: any) {
+        lastApiError = err;
+        console.warn(`Gemini model ${modelName} failed or timed out:`, err?.message);
       }
-      if (responseText) break;
     }
 
     if (responseText) {
