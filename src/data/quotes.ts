@@ -953,6 +953,60 @@ export const quotesLibrary: Quote[] = [
     category: "Warhammer 40K",
     sourceTag: "Warhammer 40K",
     insight: "El sudor y el cansancio están quemando tu versión débil para dar paso a un físico forjado en piedra."
+  },
+  {
+    id: 103,
+    text: "El Códice Astartes es solo una guía, Leandros. Te marca el camino, pero lo que realmente nos define como guerreros no son las páginas escritas, sino el coraje y la resolución con la que decidimos actuar cuando las cosas se ponen difíciles.",
+    author: "Demetrian Titus",
+    role: "Capitán de los Ultramarines (Space Marine 1)",
+    category: "Warhammer 40K",
+    sourceTag: "Warhammer 40K",
+    insight: "Tener la rutina perfecta en papel no sirve de nada si no tienes el coraje de empujar con verdadera intensidad cuando la serie quema."
+  },
+  {
+    id: 104,
+    text: "No me importa el rango que me hayan quitado ni las cicatrices que lleve en la carne. Mientras tenga aire en los pulmones, mi deber sigue siendo exactamente el mismo: dar un paso al frente y avanzar.",
+    author: "Teniente Demetrian Titus",
+    role: "Veterano de los Deathwatch (Space Marine 2)",
+    category: "Warhammer 40K",
+    sourceTag: "Warhammer 40K",
+    insight: "Da igual si perdiste meses sin entrenar o retrocediste en tus marcas. Tu deber con tu propio cuerpo empieza hoy, sin quejas."
+  },
+  {
+    id: 105,
+    text: "Que vengan todos. No estoy buscando una salida fácil ni un respiro de la tormenta; estoy aquí para ver cuántos obstáculos caen antes de que logren frenar mi marcha.",
+    author: "Demetrian Titus",
+    role: "Space Marine 2 (Warhammer 40K)",
+    category: "Warhammer 40K",
+    sourceTag: "Warhammer 40K",
+    insight: "Deja de desear entrenamientos ligeros o cómodos. Afronta cada serie pesada con la convicción de quien viene a conquistarla."
+  },
+  {
+    id: 106,
+    text: "No duden de su propia fuerza. Cuando la fatiga les nuble la vista y el dolor les suplique que retrocedan, confíen en las horas de entrenamiento, afirmen los pies y sigan adelante.",
+    author: "Demetrian Titus",
+    role: "Comandante de Escuadra (Space Marine 2)",
+    category: "Warhammer 40K",
+    sourceTag: "Warhammer 40K",
+    insight: "En la última repetición, cuando tu mente empiece a dudar si puedes sacarla: afirma los pies en el suelo, respira y levanta el peso."
+  },
+  {
+    id: 107,
+    text: "¿Crees que me quebraré ante el dolor o la duda? He caminado por el fuego de mil campos de batalla y he enterrado a hermanos de armas. Tu debilidad no tiene ningún poder sobre mí.",
+    author: "Demetrian Titus",
+    role: "Space Marine 1 (Warhammer 40K)",
+    category: "Warhammer 40K",
+    sourceTag: "Warhammer 40K",
+    insight: "Cuando la pereza o las ganas de romper la dieta intenten seducirte, recuérdate a ti mismo que la debilidad momentánea no manda sobre tu vida."
+  },
+  {
+    id: 108,
+    text: "Mi lealtad y mi disciplina no se demuestran con palabras bonitas ni discursos vacíos; se demuestran con el sudor, la sangre y los hechos concretos en el campo de batalla.",
+    author: "Demetrian Titus",
+    role: "Ultramarines (Warhammer 40K)",
+    category: "Warhammer 40K",
+    sourceTag: "Warhammer 40K",
+    insight: "Deja de hablar de tus planes en redes o con amigos. Guarda silencio, entrena duro y deja que tu físico hable por ti."
   }
 ];
 
