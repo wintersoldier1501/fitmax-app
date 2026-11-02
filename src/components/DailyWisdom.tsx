@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Quote as QuoteIcon, RefreshCw, Copy, Check, Sparkles, Brain, Lightbulb } from "lucide-react";
+import { Quote as QuoteIcon, RefreshCw, Copy, Check, Sparkles, Brain, Lightbulb, Gamepad2, BookOpen, Film, Sword, Zap } from "lucide-react";
 import { Quote, getDailyQuote, getRandomQuote, quotesLibrary } from "@/data/quotes";
 import { useFitmax } from "@/context/FitmaxContext";
 
@@ -10,28 +10,39 @@ interface DailyWisdomProps {
   compact?: boolean;
 }
 
+const filterCategories = [
+  { label: "Todos", key: "Todos", icon: Sparkles },
+  { label: "Videojuegos", key: "Videojuegos", icon: Gamepad2 },
+  { label: "Literatura", key: "Literatura", icon: BookOpen },
+  { label: "Anime & Manga", key: "Anime & Manga", icon: Sword },
+  { label: "Filosofía", key: "Filosofía", icon: Brain },
+  { label: "Cine & Culto", key: "Cine & Culto", icon: Film },
+  { label: "Disciplina", key: "Disciplina", icon: Zap }
+];
+
 export function DailyWisdom({ compact = false }: DailyWisdomProps) {
   const { addXp } = useFitmax();
+  const [selectedCategory, setSelectedCategory] = useState("Todos");
   const [currentQuote, setCurrentQuote] = useState<Quote>(getDailyQuote());
   const [copied, setCopied] = useState(false);
   const [isSpinning, setIsSpinning] = useState(false);
-  const [showInsight, setShowInsight] = useState(true);
-  const [hasClaimedXp, setHasClaimedXp] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
 
   useEffect(() => {
     // Check if daily wisdom XP already claimed today
     const claimedDate = localStorage.getItem("fitmax_wisdom_xp_date");
     const today = new Date().toDateString();
-    if (claimedDate === today) {
-      setHasClaimedXp(true);
+    if (claimedDate !== today) {
+      // Don't claim immediately, but when user interacts or reads
     }
   }, []);
 
-  const handleNextQuote = () => {
+  const handleNextQuote = (cat?: string) => {
     setIsSpinning(true);
     setTimeout(() => setIsSpinning(false), 400);
 
-    const next = getRandomQuote(currentQuote.id);
+    const targetCat = cat !== undefined ? cat : selectedCategory;
+    const next = getRandomQuote(currentQuote.id, targetCat);
     setCurrentQuote(next);
 
     // Give daily reflection XP if first time today
@@ -39,13 +50,17 @@ export function DailyWisdom({ compact = false }: DailyWisdomProps) {
     const claimedDate = localStorage.getItem("fitmax_wisdom_xp_date");
     if (claimedDate !== today) {
       localStorage.setItem("fitmax_wisdom_xp_date", today);
-      setHasClaimedXp(true);
       addXp(15);
     }
   };
 
+  const handleSelectCategory = (catKey: string) => {
+    setSelectedCategory(catKey);
+    handleNextQuote(catKey);
+  };
+
   const handleCopy = async () => {
-    const textToCopy = `"${currentQuote.text}" — ${currentQuote.author} (${currentQuote.role})\n\nVía Fitmax App`;
+    const textToCopy = `"${currentQuote.text}"\n— ${currentQuote.author} (${currentQuote.role})\n\nVía Fitmax App`;
     try {
       if (navigator.clipboard) {
         await navigator.clipboard.writeText(textToCopy);
@@ -58,14 +73,15 @@ export function DailyWisdom({ compact = false }: DailyWisdomProps) {
   };
 
   const categoryColorMap: Record<string, { bg: string; color: string; border: string }> = {
-    Estoicismo: { bg: "rgba(0, 229, 255, 0.12)", color: "#00E5FF", border: "rgba(0, 229, 255, 0.3)" },
-    Disciplina: { bg: "rgba(255, 51, 102, 0.12)", color: "#FF3366", border: "rgba(255, 51, 102, 0.3)" },
-    Autocontrol: { bg: "rgba(255, 170, 0, 0.12)", color: "#FFAA00", border: "rgba(255, 170, 0, 0.3)" },
-    Mentalidad: { bg: "rgba(168, 85, 247, 0.12)", color: "#A855F7", border: "rgba(168, 85, 247, 0.3)" },
-    Persistencia: { bg: "rgba(34, 197, 94, 0.12)", color: "#22C55E", border: "rgba(34, 197, 94, 0.3)" },
+    Videojuegos: { bg: "rgba(0, 229, 255, 0.12)", color: "#00E5FF", border: "rgba(0, 229, 255, 0.3)" },
+    Literatura: { bg: "rgba(255, 170, 0, 0.12)", color: "#FFAA00", border: "rgba(255, 170, 0, 0.3)" },
+    "Anime & Manga": { bg: "rgba(255, 51, 102, 0.12)", color: "#FF3366", border: "rgba(255, 51, 102, 0.3)" },
+    Filosofía: { bg: "rgba(168, 85, 247, 0.12)", color: "#A855F7", border: "rgba(168, 85, 247, 0.3)" },
+    "Cine & Culto": { bg: "rgba(234, 179, 8, 0.12)", color: "#EAB308", border: "rgba(234, 179, 8, 0.3)" },
+    Disciplina: { bg: "rgba(34, 197, 94, 0.12)", color: "#22C55E", border: "rgba(34, 197, 94, 0.3)" },
   };
 
-  const catStyle = categoryColorMap[currentQuote.category] || categoryColorMap.Estoicismo;
+  const catStyle = categoryColorMap[currentQuote.category] || categoryColorMap.Disciplina;
 
   return (
     <div 
@@ -98,7 +114,7 @@ export function DailyWisdom({ compact = false }: DailyWisdomProps) {
         
         {/* Top Header Bar */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap" }}>
             <span 
               style={{
                 fontSize: "0.7rem",
@@ -112,18 +128,36 @@ export function DailyWisdom({ compact = false }: DailyWisdomProps) {
                 border: `1px solid ${catStyle.border}`
               }}
             >
-              🧠 {currentQuote.category}
+              {currentQuote.category === "Videojuegos" && "🎮 "}
+              {currentQuote.category === "Literatura" && "📚 "}
+              {currentQuote.category === "Anime & Manga" && "⚔️ "}
+              {currentQuote.category === "Filosofía" && "🧠 "}
+              {currentQuote.category === "Cine & Culto" && "🎬 "}
+              {currentQuote.category === "Disciplina" && "⚡ "}
+              {currentQuote.sourceTag || currentQuote.category}
             </span>
-            <span style={{ fontSize: "0.75rem", color: "var(--text-muted)", fontWeight: 600 }}>
-              Píldora Diaria de Enfoque
-            </span>
+
+            <button
+              onClick={() => setShowFilters(!showFilters)}
+              style={{
+                background: "transparent",
+                border: "none",
+                fontSize: "0.72rem",
+                color: showFilters ? "#FFAA00" : "var(--text-muted)",
+                cursor: "pointer",
+                padding: "0.1rem 0.3rem",
+                textDecoration: "underline"
+              }}
+            >
+              {showFilters ? "Cerrar filtros" : "Filtrar por origen"}
+            </button>
           </div>
 
           {/* Action Buttons */}
           <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
             <button
               onClick={handleCopy}
-              title="Copiar frase"
+              title="Copiar reflexión"
               style={{
                 background: "rgba(255, 255, 255, 0.05)",
                 border: "1px solid var(--border)",
@@ -144,13 +178,13 @@ export function DailyWisdom({ compact = false }: DailyWisdomProps) {
             </button>
 
             <button
-              onClick={handleNextQuote}
+              onClick={() => handleNextQuote()}
               title="Leer otra reflexión"
               style={{
                 background: "rgba(255, 180, 0, 0.1)",
                 border: "1px solid rgba(255, 180, 0, 0.3)",
                 borderRadius: "8px",
-                padding: "0.35rem 0.6rem",
+                padding: "0.35rem 0.65rem",
                 color: "#FFAA00",
                 cursor: "pointer",
                 display: "flex",
@@ -173,6 +207,47 @@ export function DailyWisdom({ compact = false }: DailyWisdomProps) {
           </div>
         </div>
 
+        {/* Filter Chips Bar (Expandable) */}
+        <AnimatePresence>
+          {showFilters && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              style={{ overflow: "hidden" }}
+            >
+              <div style={{ display: "flex", gap: "0.4rem", flexWrap: "wrap", padding: "0.4rem 0" }}>
+                {filterCategories.map((cat) => {
+                  const isSelected = selectedCategory === cat.key;
+                  const Icon = cat.icon;
+                  return (
+                    <button
+                      key={cat.key}
+                      onClick={() => handleSelectCategory(cat.key)}
+                      style={{
+                        padding: "0.3rem 0.6rem",
+                        borderRadius: "8px",
+                        border: isSelected ? "1px solid #FFAA00" : "1px solid var(--border)",
+                        background: isSelected ? "rgba(255, 170, 0, 0.2)" : "rgba(255,255,255,0.03)",
+                        color: isSelected ? "#FFAA00" : "var(--text-muted)",
+                        fontSize: "0.7rem",
+                        fontWeight: isSelected ? 700 : 500,
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "0.3rem"
+                      }}
+                    >
+                      <Icon size={12} />
+                      {cat.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* Animated Quote Content */}
         <AnimatePresence mode="wait">
           <motion.div
@@ -188,7 +263,7 @@ export function DailyWisdom({ compact = false }: DailyWisdomProps) {
               style={{
                 margin: 0,
                 fontSize: compact ? "0.95rem" : "1.05rem",
-                lineHeight: "1.5",
+                lineHeight: "1.55",
                 color: "#FFFFFF",
                 fontWeight: 600,
                 fontStyle: "italic",
@@ -199,12 +274,12 @@ export function DailyWisdom({ compact = false }: DailyWisdomProps) {
             </p>
 
             {/* Author Attribution */}
-            <div style={{ display: "flex", alignItems: "baseline", gap: "0.5rem" }}>
+            <div style={{ display: "flex", alignItems: "baseline", gap: "0.5rem", flexWrap: "wrap" }}>
               <span style={{ fontSize: "0.85rem", fontWeight: 800, color: "#FFAA00" }}>
                 — {currentQuote.author}
               </span>
-              <span style={{ fontSize: "0.72rem", color: "var(--text-muted)" }}>
-                ({currentQuote.role})
+              <span style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>
+                • {currentQuote.role}
               </span>
             </div>
 
@@ -213,20 +288,20 @@ export function DailyWisdom({ compact = false }: DailyWisdomProps) {
               <div 
                 style={{
                   marginTop: "0.2rem",
-                  padding: "0.6rem 0.8rem",
+                  padding: "0.65rem 0.85rem",
                   borderRadius: "10px",
                   background: "rgba(255, 255, 255, 0.03)",
                   borderLeft: "3px solid #FFAA00",
                   fontSize: "0.78rem",
-                  color: "rgba(255, 255, 255, 0.8)",
+                  color: "rgba(255, 255, 255, 0.85)",
                   display: "flex",
                   alignItems: "flex-start",
-                  gap: "0.45rem"
+                  gap: "0.5rem"
                 }}
               >
-                <Lightbulb size={15} color="#FFAA00" style={{ flexShrink: 0, marginTop: "2px" }} />
+                <Lightbulb size={16} color="#FFAA00" style={{ flexShrink: 0, marginTop: "2px" }} />
                 <span>
-                  <strong style={{ color: "white" }}>Para hoy:</strong> {currentQuote.insight}
+                  <strong style={{ color: "white" }}>Para reflexionar hoy:</strong> {currentQuote.insight}
                 </span>
               </div>
             )}
