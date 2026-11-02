@@ -120,36 +120,23 @@ Directrices de conversación:
         new Promise<T>((_, reject) => setTimeout(() => reject(new Error("Timeout")), ms))
       ]);
 
-    // Use the official flash model with up to 13.5s timeout for thorough reasoning
-    const model = genAI.getGenerativeModel({ 
-      model: "gemini-flash-latest",
-      systemInstruction: systemPrompt 
-    });
-
-    try {
-      const chat = model.startChat({
-        history: history
-      });
-
-      const result = await withTimeout(chat.sendMessage(lastMessage || "Hola"), 13500);
-      const response = await result.response;
-      responseText = response.text();
-    } catch (err: any) {
-      lastApiError = err;
-      console.warn("Primary Gemini model failed, trying fast fallback:", err?.message);
-      
-      // Fast fallback attempt with gemini-2.5-flash
+    // Models to try in order of preference
+    const modelsToTry = ["gemini-flash-lite-latest", "gemini-flash-latest"];
+    for (const modelName of modelsToTry) {
       try {
-        const fallbackModel = genAI.getGenerativeModel({ 
-          model: "gemini-2.5-flash",
+        const model = genAI.getGenerativeModel({ 
+          model: modelName,
           systemInstruction: systemPrompt 
         });
-        const fbChat = fallbackModel.startChat({ history });
-        const fbResult = await withTimeout(fbChat.sendMessage(lastMessage || "Hola"), 4000);
-        const fbResponse = await fbResult.response;
-        responseText = fbResponse.text();
-      } catch (fbErr: any) {
-        console.warn("Secondary model also failed:", fbErr?.message);
+
+        const chat = model.startChat({ history });
+        const result = await withTimeout(chat.sendMessage(lastMessage || "Hola"), 6000);
+        const response = await result.response;
+        responseText = response.text();
+        if (responseText) break;
+      } catch (err: any) {
+        lastApiError = err;
+        console.warn(`Gemini model ${modelName} failed or timed out:`, err?.message);
       }
     }
 
@@ -157,13 +144,44 @@ Directrices de conversación:
       return NextResponse.json({ response: responseText });
     }
 
-    // If Gemini fails (quota limit, region, timeout, etc.), activate the coach fallback
-    console.warn("Activating Coach Fallback due to API error:", lastApiError?.message);
+    // 2. High-Capacity Universal Cloud LLM Fallback (OpenAI/Llama engine)
+    // Ensures the user can ask literally ANYTHING freely with dynamic intelligence
+    try {
+      console.warn("Activating Universal Free-Form AI Engine...");
+      const conversationHistory = [
+        { role: "system", content: systemPrompt },
+        ...(messages || []).slice(-8).map((m: any) => ({
+          role: m.sender === "user" ? "user" : "assistant",
+          content: m.text
+        }))
+      ];
+
+      const llmRes = await withTimeout(
+        fetch("https://text.pollinations.ai/", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            messages: conversationHistory,
+            model: "openai",
+            seed: 42
+          })
+        }),
+        7000
+      );
+
+      if (llmRes.ok) {
+        const aiText = await llmRes.text();
+        if (aiText && aiText.trim().length > 10) {
+          return NextResponse.json({ response: aiText.trim() });
+        }
+      }
+    } catch (llmErr: any) {
+      console.warn("Universal AI Fallback failed:", llmErr?.message);
+    }
+
+    // 3. Absolute offline heuristic fallback (only if both cloud engines are unreachable)
     const fallbackResponse = generateCoachFallback(lastMessage, profile, currentMacros, targetMacros);
-    return NextResponse.json({ 
-      response: fallbackResponse,
-      apiError: lastApiError?.message || String(lastApiError)
-    });
+    return NextResponse.json({ response: fallbackResponse });
 
   } catch (error: any) {
     console.error("Chat API Error:", error);
