@@ -91,21 +91,38 @@ export default function Chat() {
             <p><span className={styles.statusDot}></span> En línea</p>
           </div>
         </div>
-        <button 
-          onClick={() => window.location.href = "/science"}
-          style={{ 
-            background: "rgba(0, 229, 255, 0.1)", 
-            color: "#00E5FF", 
-            border: "1px solid #00E5FF", 
-            padding: "0.4rem 0.8rem", 
-            borderRadius: "20px",
-            fontSize: "0.8rem",
-            fontWeight: "bold",
-            cursor: "pointer"
-          }}
-        >
-          🧬 Protocolos
-        </button>
+        <div style={{ display: "flex", gap: "0.4rem" }}>
+          <button 
+            onClick={() => window.location.href = "/diet"}
+            style={{ 
+              background: "rgba(255, 51, 102, 0.15)", 
+              color: "var(--primary)", 
+              border: "1px solid var(--primary)", 
+              padding: "0.4rem 0.7rem", 
+              borderRadius: "20px",
+              fontSize: "0.78rem",
+              fontWeight: "bold",
+              cursor: "pointer"
+            }}
+          >
+            🍳 Chef IA
+          </button>
+          <button 
+            onClick={() => window.location.href = "/science"}
+            style={{ 
+              background: "rgba(0, 229, 255, 0.1)", 
+              color: "#00E5FF", 
+              border: "1px solid #00E5FF", 
+              padding: "0.4rem 0.7rem", 
+              borderRadius: "20px",
+              fontSize: "0.78rem",
+              fontWeight: "bold",
+              cursor: "pointer"
+            }}
+          >
+            🧬 Protocolos
+          </button>
+        </div>
       </header>
 
       <div className={styles.chatContainer}>
