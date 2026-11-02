@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Quote as QuoteIcon, RefreshCw, Copy, Check, Sparkles, Brain, Lightbulb, Gamepad2, BookOpen, Film, Sword, Zap } from "lucide-react";
+import { Quote as QuoteIcon, RefreshCw, Copy, Check, Sparkles, Brain, Lightbulb, Gamepad2, BookOpen, Film, Sword, Zap, Skull } from "lucide-react";
 import { Quote, getDailyQuote, getRandomQuote, quotesLibrary } from "@/data/quotes";
 import { useFitmax } from "@/context/FitmaxContext";
 
@@ -12,6 +12,7 @@ interface DailyWisdomProps {
 
 const filterCategories = [
   { label: "Todos", key: "Todos", icon: Sparkles },
+  { label: "Warhammer 40K", key: "Warhammer 40K", icon: Skull },
   { label: "Videojuegos", key: "Videojuegos", icon: Gamepad2 },
   { label: "Literatura", key: "Literatura", icon: BookOpen },
   { label: "Anime & Manga", key: "Anime & Manga", icon: Sword },
@@ -73,6 +74,7 @@ export function DailyWisdom({ compact = false }: DailyWisdomProps) {
   };
 
   const categoryColorMap: Record<string, { bg: string; color: string; border: string }> = {
+    "Warhammer 40K": { bg: "rgba(239, 68, 68, 0.15)", color: "#EF4444", border: "rgba(239, 68, 68, 0.4)" },
     Videojuegos: { bg: "rgba(0, 229, 255, 0.12)", color: "#00E5FF", border: "rgba(0, 229, 255, 0.3)" },
     Literatura: { bg: "rgba(255, 170, 0, 0.12)", color: "#FFAA00", border: "rgba(255, 170, 0, 0.3)" },
     "Anime & Manga": { bg: "rgba(255, 51, 102, 0.12)", color: "#FF3366", border: "rgba(255, 51, 102, 0.3)" },
@@ -128,6 +130,7 @@ export function DailyWisdom({ compact = false }: DailyWisdomProps) {
                 border: `1px solid ${catStyle.border}`
               }}
             >
+              {currentQuote.category === "Warhammer 40K" && "⚜️ "}
               {currentQuote.category === "Videojuegos" && "🎮 "}
               {currentQuote.category === "Literatura" && "📚 "}
               {currentQuote.category === "Anime & Manga" && "⚔️ "}

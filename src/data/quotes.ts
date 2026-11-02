@@ -3,7 +3,7 @@ export interface Quote {
   text: string;
   author: string;
   role: string;
-  category: "Videojuegos" | "Literatura" | "Filosofía" | "Anime & Manga" | "Cine & Culto" | "Disciplina";
+  category: "Warhammer 40K" | "Videojuegos" | "Literatura" | "Filosofía" | "Anime & Manga" | "Cine & Culto" | "Disciplina";
   sourceTag?: string;
   insight: string;
 }
@@ -769,6 +769,190 @@ export const quotesLibrary: Quote[] = [
     category: "Disciplina",
     sourceTag: "Jocko Willink",
     insight: "Cuando no estés progresando, no busques excusas biológicas. Revisa tus números, tu descanso y tu honestidad al entrenar."
+  },
+
+  // ==========================================
+  // ⚜️ WARHAMMER 40,000 (DUREZA & VOLUNTAD IMPERIAL)
+  // ==========================================
+  {
+    id: 83,
+    text: "La carne es débil; pero la voluntad de someterla, forjarla y disciplinarla a través del dolor del hierro es lo que nos vuelve invencibles.",
+    author: "Ferrus Manus",
+    role: "Primarca de los Manos de Hierro (Warhammer 40K)",
+    category: "Warhammer 40K",
+    sourceTag: "Warhammer 40K",
+    insight: "Tu cuerpo siempre preferirá el sillón y la pereza. Tu mente tiene el deber de someter la carne al rigor de la barra."
+  },
+  {
+    id: 84,
+    text: "No cedo terreno. No retrocedo. Ni un solo paso atrás ante la fatiga, ni un solo milímetro concedido a la duda.",
+    author: "Rogal Dorn",
+    role: "Primarca de los Puños Imperiales (Warhammer 40K)",
+    category: "Warhammer 40K",
+    sourceTag: "Warhammer 40K",
+    insight: "Cuando una serie pesada queme tus fibras, no negocies ni des un paso atrás. Aguanta y empuja."
+  },
+  {
+    id: 85,
+    text: "El dolor es el más fiel de los maestros. Te muestra exactamente en qué punto eres frágil y te exige que te reconstruyas con acero.",
+    author: "Rogal Dorn",
+    role: "Defensor de Terra (Warhammer 40K)",
+    category: "Warhammer 40K",
+    sourceTag: "Warhammer 40K",
+    insight: "No temas al cansancio muscular ni a los errores pasados; son las grietas por donde entra la disciplina."
+  },
+  {
+    id: 86,
+    text: "El dolor es una ilusión de los sentidos; la desesperación es una ilusión de la mente. Mantente firme ante ambos y nada podrá doblegarte.",
+    author: "Letanía de la Voluntad Inquebrantable",
+    role: "Códice Astartes (Warhammer 40K)",
+    category: "Warhammer 40K",
+    sourceTag: "Warhammer 40K",
+    insight: "El ardor de tus músculos en la última repetición es solo ruido biológico. Mantén la calma y ejecuta."
+  },
+  {
+    id: 87,
+    text: "No reces a los cielos pidiendo una carga más ligera ni un camino fácil; reza pidiendo hombros más anchos y fuertes para soportarla.",
+    author: "Oración de la Batalla",
+    role: "Adepta Sororitas (Warhammer 40K)",
+    category: "Warhammer 40K",
+    sourceTag: "Warhammer 40K",
+    insight: "Deja de desear que la dieta o el entrenamiento sean más fáciles. Conviértete tú en una persona más dura y disciplinada."
+  },
+  {
+    id: 88,
+    text: "El deber solo termina cuando se apaga el último aliento. La fatiga es una sugerencia cobarde que la mente disciplinada tiene la obligación de ignorar.",
+    author: "Roboute Guilliman",
+    role: "Lord Comandante del Imperio (Warhammer 40K)",
+    category: "Warhammer 40K",
+    sourceTag: "Warhammer 40K",
+    insight: "Estar cansado después del trabajo no es una razón válida para fallar a tu cuerpo. La fatiga desaparece con la primera serie."
+  },
+  {
+    id: 89,
+    text: "Sin piedad. Sin remordimiento. Sin miedo. Cuando entres a la arena, entra a aniquilar sin contemplaciones a tu propia debilidad.",
+    author: "Sigismund",
+    role: "Primer Campeón del Emperador (Black Templars)",
+    category: "Warhammer 40K",
+    sourceTag: "Warhammer 40K",
+    insight: "Entra al gimnasio con una determinación marcial: no estás ahí para pasear el celular, estás ahí para destruir tu versión perezosa."
+  },
+  {
+    id: 90,
+    text: "La victoria se paga con el sudor de la preparación silenciosa. Aquel que no esté dispuesto a sufrir en el entrenamiento jamás será digno de la victoria.",
+    author: "Gabriel Angelos",
+    role: "Capítulo Blood Ravens (Dawn of War)",
+    category: "Warhammer 40K",
+    sourceTag: "Warhammer 40K",
+    insight: "El físico estético que deseas no se desea, se paga por adelantado con semanas de disciplina invisible."
+  },
+  {
+    id: 91,
+    text: "Solo en la muerte termina el deber. Mientras el pulso siga latiendo en tus venas, hay una serie más por terminar y una batalla más por ganar.",
+    author: "Máxima de los Adeptus Astartes",
+    role: "Ángeles de la Muerte (Warhammer 40K)",
+    category: "Warhammer 40K",
+    sourceTag: "Warhammer 40K",
+    insight: "No te retires antes de tiempo. Si te quedan 2 repeticiones en la rutina, cúmplelas con honor."
+  },
+  {
+    id: 92,
+    text: "No es la ausencia de miedo lo que nos hace nobles, sino mirar fijamente al abismo más aterrador y dar el paso al frente con el arma en alto.",
+    author: "Sanguinius",
+    role: "El Gran Ángel de Baal (Warhammer 40K)",
+    category: "Warhammer 40K",
+    sourceTag: "Warhammer 40K",
+    insight: "Tener dudas o flojera antes de entrenar es humano. Presentarte a levantar a pesar de eso es lo que te forja."
+  },
+  {
+    id: 93,
+    text: "La lealtad a tus principios es su propia recompensa. No entrenes buscando el aplauso barato de los demás; forja el orgullo íntimo de saber quién eres.",
+    author: "Lion El'Jonson",
+    role: "Primarca de los Ángeles Oscuros (Warhammer 40K)",
+    category: "Warhammer 40K",
+    sourceTag: "Warhammer 40K",
+    insight: "No entrenes por likes o validación ajena. Entrena por el respeto sagrado de cumplir tu palabra contigo mismo."
+  },
+  {
+    id: 94,
+    text: "Ellos creen que nos rendiremos porque nos ven sangrar y jadear. No comprenden que el dolor solo nos vuelve infinitamente más peligrosos.",
+    author: "Comisario Yarrick",
+    role: "Héroe de Armageddon (Warhammer 40K)",
+    category: "Warhammer 40K",
+    sourceTag: "Warhammer 40K",
+    insight: "Cuando una semana sea difícil o estés agotado, úsalo como combustible. Que cada golpe de la vida te haga más implacable."
+  },
+  {
+    id: 95,
+    text: "Un cuerpo débil engendra una mente débil y complaciente. La carne no es más que un instrumento que debe ser templado sin piedad en el yunque de la constancia.",
+    author: "Pensamiento del Día",
+    role: "Archivos Imperiales de Terra (Warhammer 40K)",
+    category: "Warhammer 40K",
+    sourceTag: "Warhammer 40K",
+    insight: "Tu mente nunca alcanzará su máximo potencial de lucidez y seguridad si tu cuerpo está abandonado."
+  },
+  {
+    id: 96,
+    text: "El hierro perdura a través de los siglos porque desconoce la pereza, el autoengaño y la debilidad. Haz de tu disciplina un mecanismo frío e implacable.",
+    author: "Cánticos del Mechanicus",
+    role: "Sacerdotes de Marte (Warhammer 40K)",
+    category: "Warhammer 40K",
+    sourceTag: "Warhammer 40K",
+    insight: "No dependas de emociones variables para entrenar. Conviértete en un mecanismo que ejecuta sus hábitos sin vacilar."
+  },
+  {
+    id: 97,
+    text: "Mi armadura puede abollarse y mi carne puede desgarrarse, pero mi determinación ante la misión permanecerá intacta hasta el final.",
+    author: "Capitán Demetrian Titus",
+    role: "Space Marine II (Warhammer 40K)",
+    category: "Warhammer 40K",
+    sourceTag: "Warhammer 40K",
+    insight: "Habrá días con dolores musculares o jornadas pesadas. Mantén tu meta fija en el horizonte sin perder el rumbo."
+  },
+  {
+    id: 98,
+    text: "No les prometo una victoria fácil ni un camino cómodo. Les prometo que cuando termine la jornada, sabrán con exactitud de qué madera estamos hechos.",
+    author: "Capellán Merek Grimaldus",
+    role: "Héroe de Helsreach (Black Templars)",
+    category: "Warhammer 40K",
+    sourceTag: "Warhammer 40K",
+    insight: "Transformar tu físico no es un paseo dominical: es una prueba de carácter donde se demuestra quién eres de verdad."
+  },
+  {
+    id: 99,
+    text: "¿Acaso quieren vivir para siempre en la mediocridad? ¡Dejen de compadecerse de ustedes mismos y avancen hacia el fuego con la cabeza en alto!",
+    author: "Comisario Ibram Gaunt",
+    role: "Primero y Único de Tanith (Warhammer 40K)",
+    category: "Warhammer 40K",
+    sourceTag: "Warhammer 40K",
+    insight: "La autocompasión es veneno. Deja las quejas en la puerta del gimnasio y concéntrate en levantar con fuerza."
+  },
+  {
+    id: 100,
+    text: "No te detengas a lamentar lo que has dejado atrás ni los días que perdiste. La velocidad del verdadero progreso solo pertenece a los que miran fijamente hacia adelante.",
+    author: "Jaghatai Khan",
+    role: "El Gran Khan (Cicatrices Blancas - Warhammer 40K)",
+    category: "Warhammer 40K",
+    sourceTag: "Warhammer 40K",
+    insight: "El tiempo perdido ya no existe. Acelera hacia tus metas a partir de este preciso segundo."
+  },
+  {
+    id: 101,
+    text: "Desde las sombras más profundas de la prueba y la desolación surge la luz de los que supieron soportar la oscuridad sin quebrarse.",
+    author: "Corvus Corax",
+    role: "Primarca de la Guardia del Cuervo (Warhammer 40K)",
+    category: "Warhammer 40K",
+    sourceTag: "Warhammer 40K",
+    insight: "Los meses en los que entrenas a solas sin que nadie note tus cambios son el preludio de una transformación asombrosa."
+  },
+  {
+    id: 102,
+    text: "En el fuego de la forja, el metal no se destruye: se purifica de sus impurezas para convertirse en un arma indestructible. Acepta el fuego de tu esfuerzo.",
+    author: "Vulkan",
+    role: "Primarca de los Salamandras (Warhammer 40K)",
+    category: "Warhammer 40K",
+    sourceTag: "Warhammer 40K",
+    insight: "El sudor y el cansancio están quemando tu versión débil para dar paso a un físico forjado en piedra."
   }
 ];
 
