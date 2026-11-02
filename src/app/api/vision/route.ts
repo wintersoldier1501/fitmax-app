@@ -43,8 +43,8 @@ Si la imagen no parece comida, intenta adivinar o devuelve valores en 0, pero si
       }
     ];
 
-    // Attempt with current gemini-3.8-flash, fallback to gemini-2.0-flash
-    const modelsToTry = ["gemini-3.8-flash", "gemini-2.0-flash"];
+    // Attempt with current official models verified in AI Studio
+    const modelsToTry = ["gemini-flash-latest", "gemini-3.7-flash", "gemini-3.5-flash", "gemini-3.8-flash"];
     let text = "";
     let lastError: any = null;
 

@@ -74,42 +74,37 @@ export async function POST(req: Request) {
 
     const lastMessage = messages && messages.length > 0 ? messages[messages.length - 1].text : "";
 
-    // Debug: Check which models are genuinely available to this API key in Google Cloud/AI Studio
-    if (lastMessage === "LIST_MODELS_DEBUG") {
-      try {
-        const key = process.env.GEMINI_API_KEY || "";
-        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${key}`);
-        const data = await res.json();
-        const modelNames = data.models ? data.models.map((m: any) => m.name.replace("models/", "")) : data;
-        return NextResponse.json({ availableModels: modelNames, keyPrefix: key.slice(0, 8) });
-      } catch (e: any) {
-        return NextResponse.json({ debugFetchError: e.message });
-      }
-    }
-
     if (!process.env.GEMINI_API_KEY) {
-      // If no key configured, use the smart local coach fallback
       const fallbackResponse = generateCoachFallback(lastMessage, profile, currentMacros, targetMacros);
       return NextResponse.json({ response: fallbackResponse });
     }
 
     const systemPrompt = `
-Eres un Coach Nutricional y Deportivo Profesional de Fitmax. Hablas en español, con un tono motivador, directo, científico pero accesible.
-Tu misión principal es ayudar al usuario a alcanzar su meta: ${profile?.goal || "Mejorar su físico"}.
-Perfil del usuario: ${profile?.name || "Guerrero"}, ${profile?.sex || "H"}, Edad: ${profile?.age || 25}, Peso: ${profile?.weight || 75}kg.
-Macros de hoy: 
-- Consumidos: ${currentMacros?.protein || 0}g Proteína, ${currentMacros?.carbs || 0}g Carbos, ${currentMacros?.fats || 0}g Grasas.
-- Meta diaria: ${targetMacros?.protein || 150}g Proteína, ${targetMacros?.carbs || 200}g Carbos, ${targetMacros?.fats || 60}g Grasas.
+Eres el Coach IA oficial de Fitmax: un entrenador personal de élite, preparador físico y nutricionista deportivo de vanguardia.
+Tienes libertad total para responder a CUALQUIER duda, pregunta o petición del usuario: desde rutinas detalladas de gimnasio o casa, biomecánica, suplementos (creatina, proteína whey, cafeína), alimentos, recetas, mitos de nutrición, dudas de salud general, motivación, o dudas de vida diaria y fitness.
 
-Reglas:
-1. Responde de manera concisa y directa (máximo 2 a 3 párrafos cortos).
-2. Anima al usuario basándote en sus macros actuales.
-3. Si el usuario te dice que acaba de comer algo, dile cuántos macros estima que tiene, pero RECUÉRDALE que para que se sumen a su anillo debe usar el "Escáner Láser" o el "Buscador Manual" en el botón central de Fitmax.
-4. No uses lenguaje robótico. Eres su coach personal en su bolsillo.
+Tu perfil de alumno actual:
+- Nombre: ${profile?.name || "Guerrero"}
+- Meta: ${profile?.goal || "Mejorar su físico"}
+- Sexo: ${profile?.sex || "H"}, Edad: ${profile?.age || 25}, Peso: ${profile?.weight || 75}kg.
+- Progreso de macros hoy:
+  * Consumido: ${currentMacros?.protein || 0}g Proteína, ${currentMacros?.carbs || 0}g Carbos, ${currentMacros?.fats || 0}g Grasas.
+  * Meta diaria: ${targetMacros?.protein || 150}g Proteína, ${targetMacros?.carbs || 200}g Carbos, ${targetMacros?.fats || 60}g Grasas.
+
+Directrices de conversación:
+1. Sé 100% conversacional, natural, motivador, empático y profundamente experto. No seas un bot acartonado ni repitas discursos prefabricados.
+2. Responde directamente y con profundidad a lo que el usuario pregunte. Si te pregunta sobre qué ejercicios hacer de pecho, cuántas series, cómo manejar la velocidad de bajada (tensión mecánica) y si ir o no al fallo, DESGLÓSALE exactamente cada punto con ejemplos prácticos y fundamentos científicos.
+3. Si te preguntan sobre marcas de proteína, recetas con lo que tienen en la cocina, o cómo entrenar con poco tiempo, dales soluciones claras paso a paso.
+4. Mantén tus respuestas fáciles de leer en un celular, usando viñetas claras y negritas.
 `;
 
-    // Models to try in order of preference
-    const modelsToTry = ["gemini-3.8-flash", "gemini-3.8-flash-lite", "gemini-3.8-pro"];
+    // Models verified active and available in Google AI Studio
+    const modelsToTry = [
+      "gemini-flash-latest",
+      "gemini-3.7-flash",
+      "gemini-3.5-flash",
+      "gemini-3.8-flash"
+    ];
     let responseText: string | null = null;
     let lastApiError: any = null;
 
