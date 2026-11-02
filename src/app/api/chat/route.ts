@@ -74,6 +74,19 @@ export async function POST(req: Request) {
 
     const lastMessage = messages && messages.length > 0 ? messages[messages.length - 1].text : "";
 
+    // Debug: Check which models are genuinely available to this API key in Google Cloud/AI Studio
+    if (lastMessage === "LIST_MODELS_DEBUG") {
+      try {
+        const key = process.env.GEMINI_API_KEY || "";
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${key}`);
+        const data = await res.json();
+        const modelNames = data.models ? data.models.map((m: any) => m.name.replace("models/", "")) : data;
+        return NextResponse.json({ availableModels: modelNames, keyPrefix: key.slice(0, 8) });
+      } catch (e: any) {
+        return NextResponse.json({ debugFetchError: e.message });
+      }
+    }
+
     if (!process.env.GEMINI_API_KEY) {
       // If no key configured, use the smart local coach fallback
       const fallbackResponse = generateCoachFallback(lastMessage, profile, currentMacros, targetMacros);
