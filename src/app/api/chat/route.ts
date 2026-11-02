@@ -106,6 +106,8 @@ Reglas:
         new Promise<T>((_, reject) => setTimeout(() => reject(new Error("Timeout")), ms))
       ]);
 
+    const errorsByModel: Record<string, string> = {};
+
     for (const modelName of modelsToTry) {
       try {
         const model = genAI.getGenerativeModel({ 
@@ -122,6 +124,7 @@ Reglas:
         responseText = response.text();
         if (responseText) break;
       } catch (err: any) {
+        errorsByModel[modelName] = err?.message || String(err);
         lastApiError = err;
         console.warn(`Gemini model ${modelName} failed or timed out:`, err?.message);
       }
@@ -136,7 +139,7 @@ Reglas:
     const fallbackResponse = generateCoachFallback(lastMessage, profile, currentMacros, targetMacros);
     return NextResponse.json({ 
       response: fallbackResponse,
-      debugError: lastApiError?.message || String(lastApiError)
+      debugError: JSON.stringify(errorsByModel)
     });
 
   } catch (error: any) {
