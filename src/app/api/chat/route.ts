@@ -155,13 +155,10 @@ Reglas:
       return NextResponse.json({ response: responseText });
     }
 
-    // If Gemini fails (quota limit, region, etc.), activate the coach fallback
+    // If Gemini fails (quota limit, region, timeout, etc.), activate the coach fallback
     console.warn("Activating Coach Fallback due to API error:", lastApiError?.message);
     const fallbackResponse = generateCoachFallback(lastMessage, profile, currentMacros, targetMacros);
-    return NextResponse.json({ 
-      response: fallbackResponse,
-      debugError: JSON.stringify(errorsByModel)
-    });
+    return NextResponse.json({ response: fallbackResponse });
 
   } catch (error: any) {
     console.error("Chat API Error:", error);
