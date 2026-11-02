@@ -160,7 +160,10 @@ Directrices de conversación:
     // If Gemini fails (quota limit, region, timeout, etc.), activate the coach fallback
     console.warn("Activating Coach Fallback due to API error:", lastApiError?.message);
     const fallbackResponse = generateCoachFallback(lastMessage, profile, currentMacros, targetMacros);
-    return NextResponse.json({ response: fallbackResponse });
+    return NextResponse.json({ 
+      response: fallbackResponse,
+      apiError: lastApiError?.message || String(lastApiError)
+    });
 
   } catch (error: any) {
     console.error("Chat API Error:", error);
