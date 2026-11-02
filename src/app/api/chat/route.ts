@@ -117,7 +117,7 @@ Reglas:
           history: history
         });
 
-        const result = await withTimeout(chat.sendMessage(lastMessage || "Hola"), 4500);
+        const result = await withTimeout(chat.sendMessage(lastMessage || "Hola"), 15000);
         const response = await result.response;
         responseText = response.text();
         if (responseText) break;
@@ -134,7 +134,10 @@ Reglas:
     // If Gemini fails (quota limit, region, etc.), activate the coach fallback
     console.warn("Activating Coach Fallback due to API error:", lastApiError?.message);
     const fallbackResponse = generateCoachFallback(lastMessage, profile, currentMacros, targetMacros);
-    return NextResponse.json({ response: fallbackResponse });
+    return NextResponse.json({ 
+      response: fallbackResponse,
+      debugError: lastApiError?.message || String(lastApiError)
+    });
 
   } catch (error: any) {
     console.error("Chat API Error:", error);
