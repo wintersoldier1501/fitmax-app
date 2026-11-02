@@ -61,7 +61,7 @@ export default function Chat() {
       const coachMessage: Message = { 
         id: (Date.now() + 1).toString(), 
         sender: "coach", 
-        text: data.response || "Hubo un error al procesar mi respuesta." 
+        text: data.response || data.error || "¡Aquí estoy! Cuéntame qué comiste o cómo te fue en tu entrenamiento hoy." 
       };
       
       setMessages(prev => [...prev, coachMessage]);

@@ -21,8 +21,6 @@ export async function POST(req: Request) {
     const base64Data = image.split(",")[1] || image;
     const mimeType = image.split(";")[0].split(":")[1] || "image/jpeg";
 
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
-
     const prompt = `
 Eres un nutricionista experto. Analiza la comida en esta imagen y estima sus macronutrientes.
 Responde ÚNICAMENTE con un objeto JSON válido, sin formato Markdown, con esta estructura exacta:
@@ -45,9 +43,27 @@ Si la imagen no parece comida, intenta adivinar o devuelve valores en 0, pero si
       }
     ];
 
-    const result = await model.generateContent([prompt, ...imageParts]);
-    const response = await result.response;
-    let text = response.text().trim();
+    // Attempt with current gemini-3.8-flash, fallback to gemini-2.0-flash
+    const modelsToTry = ["gemini-3.8-flash", "gemini-2.0-flash"];
+    let text = "";
+    let lastError: any = null;
+
+    for (const modelName of modelsToTry) {
+      try {
+        const model = genAI.getGenerativeModel({ model: modelName });
+        const result = await model.generateContent([prompt, ...imageParts]);
+        const response = await result.response;
+        text = response.text().trim();
+        if (text) break;
+      } catch (err: any) {
+        lastError = err;
+        console.warn(`Vision model ${modelName} failed:`, err?.message);
+      }
+    }
+
+    if (!text) {
+      throw lastError || new Error("No se pudo procesar la imagen con los modelos disponibles.");
+    }
     
     // Clean up markdown if the AI includes it despite instructions
     if (text.startsWith("\`\`\`json")) text = text.replace("\`\`\`json", "");
