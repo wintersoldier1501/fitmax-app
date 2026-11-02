@@ -12,7 +12,7 @@ import { useRouter } from "next/navigation";
 import { Dumbbell, ChevronRight, Camera, User, Droplets, Plus, Minus, X, Check, Scale, Sparkles } from "lucide-react";
 
 export default function Dashboard() {
-  const { isLoaded, profile, targetMacros, currentMacros, xp, streak, waterGlasses, addWater, removeWater, setProfileAndCalculate, addXp } = useFitmax();
+  const { isLoaded, profile, targetMacros, currentMacros, xp, streak, waterGlasses, addWater, removeWater, setProfileAndCalculate, addXp, customWorkoutPlan } = useFitmax();
   const router = useRouter();
 
   // Check-in modal state
@@ -213,15 +213,27 @@ export default function Dashboard() {
         transition={{ duration: 0.5, delay: 0.4 }}
         style={{ marginTop: "2rem" }}
       >
-        <h2 className={styles.sectionTitle}>Tu Entrenamiento</h2>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.8rem" }}>
+          <h2 className={styles.sectionTitle} style={{ margin: 0 }}>Tu Entrenamiento</h2>
+          {customWorkoutPlan ? (
+            <span style={{ fontSize: "0.75rem", color: "#00E5FF", fontWeight: "bold", background: "rgba(0, 229, 255, 0.12)", padding: "0.2rem 0.6rem", borderRadius: "10px", border: "1px solid rgba(0, 229, 255, 0.3)" }}>
+              ⚡ Split Activo ({customWorkoutPlan.daysPerWeek}D)
+            </span>
+          ) : (
+            <span style={{ fontSize: "0.75rem", color: "var(--primary)", fontWeight: "bold", background: "rgba(255, 51, 102, 0.12)", padding: "0.2rem 0.6rem", borderRadius: "10px", border: "1px solid rgba(255, 51, 102, 0.3)" }}>
+              ✨ Generador IA
+            </span>
+          )}
+        </div>
         <div 
           onClick={() => router.push("/workout")}
           className="glass-card"
           style={{ 
-            padding: "1.5rem",
+            padding: "1.3rem 1.5rem",
             cursor: "pointer",
             position: "relative",
-            overflow: "hidden"
+            overflow: "hidden",
+            border: customWorkoutPlan ? "1px solid rgba(0, 229, 255, 0.3)" : undefined
           }}
         >
           <div style={{ position: "absolute", top: "-20px", right: "-10px", opacity: 0.05, zIndex: 0, color: "var(--text-main)" }}>
@@ -229,16 +241,23 @@ export default function Dashboard() {
           </div>
           <div style={{ position: "relative", zIndex: 1, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <div>
-              <h3 style={{ margin: "0 0 0.5rem 0", color: "var(--text-main)", fontSize: "1.2rem", fontWeight: 800 }}>RUTINA DEL DÍA</h3>
-              <p style={{ margin: 0, color: "var(--text-muted)", fontSize: "0.9rem" }}>Generada por IA según tu objetivo</p>
+              <h3 style={{ margin: "0 0 0.3rem 0", color: "var(--text-main)", fontSize: "1.15rem", fontWeight: 800 }}>
+                {customWorkoutPlan ? customWorkoutPlan.splitTitle : "RUTINA DEL DÍA"}
+              </h3>
+              <p style={{ margin: 0, color: "var(--text-muted)", fontSize: "0.85rem" }}>
+                {customWorkoutPlan 
+                  ? `${customWorkoutPlan.days?.[0]?.dayName || "Sesión de Hipertrofia"} • ${customWorkoutPlan.equipment}`
+                  : "Genera tu split semanal 100% personalizado por IA"}
+              </p>
             </div>
             <div className="glow-primary" style={{ 
               width: "40px", height: "40px", 
-              backgroundColor: "var(--primary)", 
+              backgroundColor: customWorkoutPlan ? "#00E5FF" : "var(--primary)", 
               borderRadius: "50%", 
               display: "flex", alignItems: "center", justifyContent: "center",
+              boxShadow: customWorkoutPlan ? "0 0 15px rgba(0, 229, 255, 0.4)" : undefined
             }}>
-              <ChevronRight color="white" size={24} />
+              <ChevronRight color={customWorkoutPlan ? "black" : "white"} size={24} />
             </div>
           </div>
         </div>

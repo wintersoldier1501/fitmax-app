@@ -65,6 +65,8 @@ interface FitmaxState {
   saveTheme: (theme: string) => void;
   customDiet: any;
   saveDiet: (diet: any) => void;
+  customWorkoutPlan: any;
+  saveWorkoutPlan: (plan: any) => void;
   resetProgress: () => void; // For testing or new day
   user: User | null;
   loginWithGoogle: () => Promise<void>;
@@ -86,6 +88,7 @@ export const FitmaxProvider = ({ children }: { children: ReactNode }) => {
   const [currentMacros, setCurrentMacros] = useState<Macros>(defaultMacros);
   const [loggedFoods, setLoggedFoods] = useState<FoodLog[]>([]);
   const [customDiet, setCustomDiet] = useState<any>(null);
+  const [customWorkoutPlan, setCustomWorkoutPlan] = useState<any>(null);
   const [xp, setXp] = useState(0); 
   const [streak, setStreak] = useState(0);
   const [bodyFat, setBodyFat] = useState<number | null>(null);
@@ -103,6 +106,7 @@ export const FitmaxProvider = ({ children }: { children: ReactNode }) => {
     const savedCurrent = localStorage.getItem("fitmax_currentMacros");
     const savedLogs = localStorage.getItem("fitmax_loggedFoods");
     const savedDiet = localStorage.getItem("fitmax_customDiet");
+    const savedWorkoutPlan = localStorage.getItem("fitmax_customWorkoutPlan");
     const savedXp = localStorage.getItem("fitmax_xp");
     const savedStreak = localStorage.getItem("fitmax_streak");
     const savedBiometrics = localStorage.getItem("fitmax_biometrics");
@@ -115,6 +119,7 @@ export const FitmaxProvider = ({ children }: { children: ReactNode }) => {
     if (savedProfile) setProfile(JSON.parse(savedProfile));
     if (savedTarget) setTargetMacros(JSON.parse(savedTarget));
     if (savedDiet) setCustomDiet(JSON.parse(savedDiet));
+    if (savedWorkoutPlan) setCustomWorkoutPlan(JSON.parse(savedWorkoutPlan));
     if (savedXp) setXp(Number(savedXp));
     if (savedStreak) setStreak(Number(savedStreak));
     if (savedBiometrics) setBiometrics(JSON.parse(savedBiometrics));
@@ -197,6 +202,7 @@ export const FitmaxProvider = ({ children }: { children: ReactNode }) => {
       localStorage.setItem("fitmax_currentMacros", JSON.stringify(currentMacros));
       localStorage.setItem("fitmax_loggedFoods", JSON.stringify(loggedFoods));
       localStorage.setItem("fitmax_customDiet", JSON.stringify(customDiet));
+      localStorage.setItem("fitmax_customWorkoutPlan", JSON.stringify(customWorkoutPlan));
       localStorage.setItem("fitmax_xp", xp.toString());
       localStorage.setItem("fitmax_streak", streak.toString());
       localStorage.setItem("fitmax_biometrics", JSON.stringify(biometrics));
@@ -328,6 +334,10 @@ export const FitmaxProvider = ({ children }: { children: ReactNode }) => {
     setCustomDiet(diet);
   };
 
+  const saveWorkoutPlan = (plan: any) => {
+    setCustomWorkoutPlan(plan);
+  };
+
   const resetProgress = () => {
     setCurrentMacros(defaultMacros);
     setLoggedFoods([]);
@@ -336,7 +346,7 @@ export const FitmaxProvider = ({ children }: { children: ReactNode }) => {
   };
 
   return (
-    <FitmaxContext.Provider value={{ isLoaded, profile, targetMacros, currentMacros, loggedFoods, biometrics, activeTheme, xp, streak, setProfileAndCalculate, updateAvatar, updateName, addFoodLog, removeFoodLog, waterGlasses, addWater, removeWater, addXp, saveTheme, customDiet, saveDiet, resetProgress, user, loginWithGoogle, logout, lastResetDate }}>
+    <FitmaxContext.Provider value={{ isLoaded, profile, targetMacros, currentMacros, loggedFoods, biometrics, activeTheme, xp, streak, setProfileAndCalculate, updateAvatar, updateName, addFoodLog, removeFoodLog, waterGlasses, addWater, removeWater, addXp, saveTheme, customDiet, saveDiet, customWorkoutPlan, saveWorkoutPlan, resetProgress, user, loginWithGoogle, logout, lastResetDate }}>
       {children}
     </FitmaxContext.Provider>
   );
