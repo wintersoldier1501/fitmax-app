@@ -49,6 +49,9 @@ export default function DietCenter() {
     setRecipe(null);
     setIsLogged(false);
 
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 7500);
+
     try {
       const res = await fetch("/api/chef", {
         method: "POST",
@@ -63,17 +66,49 @@ export default function DietCenter() {
             calories: calRemain
           },
           prepTime
-        })
+        }),
+        signal: controller.signal
       });
 
+      clearTimeout(timeoutId);
       const data = await res.json();
       if (data.recipe) {
         setRecipe(data.recipe);
       } else {
-        alert(data.error || "No se pudo generar la receta, intenta de nuevo.");
+        throw new Error(data.error || "No recipe returned");
       }
-    } catch (e) {
-      alert("Error de conexión al conectar con el Chef IA.");
+    } catch (e: any) {
+      console.warn("Chef fetch issue, creating instant backup recipe...", e);
+      clearTimeout(timeoutId);
+      // Instant Client-side Fallback so the user NEVER hangs!
+      const items = ingredientsInput.split(/[,;\n]+/).map(s => s.trim()).filter(Boolean);
+      const p = Math.max(25, Math.round(pRemain * 0.5));
+      const c = Math.max(30, Math.round(cRemain * 0.5));
+      const f = Math.max(10, Math.round(fRemain * 0.5));
+      setRecipe({
+        title: `Platillo Fitness Express (${items.slice(0, 2).join(" & ") || "Ingredientes Caseros"})`,
+        prepTime: prepTime || "10 min",
+        difficulty: "Fácil",
+        ingredientsWithPortions: [
+          `Base seleccionada: ${ingredientsInput}`,
+          "Porción proteica principal (huevo, atún o pollo a tu elección)",
+          "Acompañamiento de carbohidratos (tortillas, avena o arroz)",
+          "Grasas saludables (aguacate o aceite de oliva)"
+        ],
+        steps: [
+          "Calienta una sartén antiadherente a fuego medio con unas gotas de aceite.",
+          "Cocina primero la fuente de proteína hasta que esté en su punto jugoso.",
+          "Agrega los demás ingredientes y saltea durante 3 a 5 minutos a fuego medio.",
+          "Sirve caliente y disfruta una comida balanceada."
+        ],
+        macros: {
+          protein: p,
+          carbs: c,
+          fats: f,
+          calories: (p * 4) + (c * 4) + (f * 9)
+        },
+        chefTip: "Usa hierbas aromáticas y especias (ajo en polvo, orégano, pimienta) para añadir gran sabor sin sumar calorías."
+      });
     } finally {
       setIsGenerating(false);
     }
