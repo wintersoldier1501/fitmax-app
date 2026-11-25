@@ -2,6 +2,7 @@
 
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { useFitmax, compressThumbnail } from "@/context/FitmaxContext";
 import { RestaurantInfiltratorModal } from "./RestaurantInfiltratorModal";
 import { useRouter } from "next/navigation";
@@ -50,8 +51,13 @@ export const FloatingScanner = () => {
   const [showRestaurantInfiltrator, setShowRestaurantInfiltrator] = useState(false);
   const [visionAssistedHint, setVisionAssistedHint] = useState("");
   const [isAssistingText, setIsAssistingText] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const scanModeRef = useRef<"meal" | "label">("meal");
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const handleCapture = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -309,142 +315,6 @@ export const FloatingScanner = () => {
           transition={{ duration: 2.2, repeat: Infinity, ease: "easeOut" }}
         />
 
-        {/* Mode Selector Menu */}
-        <AnimatePresence>
-          {showMenu && (
-            <motion.div
-              initial={{ opacity: 0, y: 18, scale: 0.85 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 18, scale: 0.85 }}
-              style={{
-                position: "absolute",
-                bottom: "80px",
-                left: "50%",
-                transform: "translateX(-50%)",
-                backgroundColor: "var(--bg-surface-solid)",
-                backdropFilter: "var(--blur-lg)",
-                border: "1px solid var(--border)",
-                borderRadius: "20px",
-                padding: "0.55rem",
-                display: "flex",
-                flexDirection: "column",
-                gap: "0.45rem",
-                width: "235px",
-                boxShadow: "0 14px 45px rgba(0,0,0,0.85)"
-              }}
-            >
-              <button
-                onClick={() => triggerPhotoScan("meal")}
-                style={{
-                  padding: "0.85rem 0.9rem",
-                  background: "rgba(255,255,255,0.03)",
-                  border: "1px solid var(--border)",
-                  color: "white",
-                  textAlign: "left",
-                  borderRadius: "12px",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "0.75rem"
-                }}
-              >
-                <Camera size={18} color="var(--primary)" />
-                <span style={{ fontFamily: "var(--font-sans)", fontWeight: 600, fontSize: "0.86rem" }}>
-                  Escanear Platillo IA
-                </span>
-              </button>
-
-              <button
-                onClick={() => triggerPhotoScan("label")}
-                style={{
-                  padding: "0.85rem 0.9rem",
-                  background: "rgba(255,255,255,0.03)",
-                  border: "1px solid var(--border)",
-                  color: "white",
-                  textAlign: "left",
-                  borderRadius: "12px",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "0.75rem"
-                }}
-              >
-                <FileText size={18} color="var(--accent)" />
-                <span style={{ fontFamily: "var(--font-sans)", fontWeight: 600, fontSize: "0.86rem" }}>
-                  Leer Tabla Nutrimental
-                </span>
-              </button>
-
-              <button
-                onClick={() => {
-                  setShowMenu(false);
-                  setShowLiveScanner(true);
-                }}
-                style={{
-                  padding: "0.85rem 0.9rem",
-                  background: "rgba(255,255,255,0.03)",
-                  border: "1px solid var(--border)",
-                  color: "white",
-                  textAlign: "left",
-                  borderRadius: "12px",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "0.75rem"
-                }}
-              >
-                <ScanBarcode size={18} color="var(--primary)" />
-                <span style={{ fontFamily: "var(--font-sans)", fontWeight: 600, fontSize: "0.86rem" }}>
-                  Código de Barras
-                </span>
-              </button>
-
-              <button
-                onClick={() => {
-                  setShowMenu(false);
-                  setShowRestaurantInfiltrator(true);
-                }}
-                style={{
-                  padding: "0.85rem 0.9rem",
-                  background: "rgba(245, 158, 11, 0.1)",
-                  border: "1px solid rgba(245, 158, 11, 0.35)",
-                  color: "#FBBF24",
-                  textAlign: "left",
-                  borderRadius: "12px",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "0.75rem"
-                }}
-              >
-                <Utensils size={18} color="#FBBF24" />
-                <span style={{ fontFamily: "var(--font-sans)", fontWeight: 700, fontSize: "0.86rem" }}>
-                  Carta de Restaurante IA
-                </span>
-              </button>
-
-              <button
-                onClick={() => {
-                  setShowMenu(false);
-                  router.push("/log");
-                }}
-                style={{
-                  padding: "0.85rem 0.9rem",
-                  background: "var(--primary-subtle)",
-                  border: "1px solid var(--primary-border)",
-                  color: "white",
-                  textAlign: "left",
-                  borderRadius: "12px",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "0.75rem"
-                }}
-              >
-                <Mic size={18} color="var(--primary)" />
-                <span style={{ fontFamily: "var(--font-sans)", fontWeight: 600, fontSize: "0.86rem" }}>
-                  Diario Rápido / Voz IA
-                </span>
-              </button>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
         {/* Main FAB */}
         <motion.button
           onClick={() => setShowMenu(!showMenu)}
@@ -480,9 +350,168 @@ export const FloatingScanner = () => {
         </motion.button>
       </div>
 
-      {/* Fullscreen Overlays */}
-      <AnimatePresence>
-        {showLiveScanner && (
+      {/* Fullscreen Overlays & Centered Menu Portaled to body (escapes BottomNav transform/backdrop-filter) */}
+      {mounted &&
+        createPortal(
+          <>
+            <AnimatePresence>
+              {showMenu && (
+                <>
+                  <motion.div
+                    key="fab-backdrop"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    onClick={() => setShowMenu(false)}
+                    style={{
+                      position: "fixed",
+                      inset: 0,
+                      background: "rgba(0, 0, 0, 0.62)",
+                      backdropFilter: "blur(4px)",
+                      WebkitBackdropFilter: "blur(4px)",
+                      zIndex: 48
+                    }}
+                  />
+                  <motion.div
+                    key="fab-menu"
+                    initial={{ opacity: 0, y: 16, scale: 0.94 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 16, scale: 0.94 }}
+                    style={{
+                      position: "fixed",
+                      bottom: "6.35rem",
+                      left: 0,
+                      right: 0,
+                      margin: "0 auto",
+                      width: "min(288px, calc(100vw - 2rem))",
+                      backgroundColor: "var(--bg-surface-solid)",
+                      backdropFilter: "var(--blur-lg)",
+                      WebkitBackdropFilter: "var(--blur-lg)",
+                      border: "1px solid var(--border)",
+                      borderRadius: "22px",
+                      padding: "0.6rem",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "0.45rem",
+                      boxShadow: "0 18px 50px rgba(0,0,0,0.88)",
+                      zIndex: 150
+                    }}
+                  >
+                    <button
+                      onClick={() => triggerPhotoScan("meal")}
+                      style={{
+                        padding: "0.85rem 0.95rem",
+                        background: "rgba(255,255,255,0.03)",
+                        border: "1px solid var(--border)",
+                        color: "white",
+                        textAlign: "left",
+                        borderRadius: "12px",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "0.75rem"
+                      }}
+                    >
+                      <Camera size={18} color="var(--primary)" style={{ flexShrink: 0 }} />
+                      <span style={{ fontFamily: "var(--font-sans)", fontWeight: 600, fontSize: "0.86rem" }}>
+                        Escanear Platillo IA
+                      </span>
+                    </button>
+
+                    <button
+                      onClick={() => triggerPhotoScan("label")}
+                      style={{
+                        padding: "0.85rem 0.95rem",
+                        background: "rgba(255,255,255,0.03)",
+                        border: "1px solid var(--border)",
+                        color: "white",
+                        textAlign: "left",
+                        borderRadius: "12px",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "0.75rem"
+                      }}
+                    >
+                      <FileText size={18} color="var(--accent)" style={{ flexShrink: 0 }} />
+                      <span style={{ fontFamily: "var(--font-sans)", fontWeight: 600, fontSize: "0.86rem" }}>
+                        Leer Tabla Nutrimental
+                      </span>
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        setShowMenu(false);
+                        setShowLiveScanner(true);
+                      }}
+                      style={{
+                        padding: "0.85rem 0.95rem",
+                        background: "rgba(255,255,255,0.03)",
+                        border: "1px solid var(--border)",
+                        color: "white",
+                        textAlign: "left",
+                        borderRadius: "12px",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "0.75rem"
+                      }}
+                    >
+                      <ScanBarcode size={18} color="var(--primary)" style={{ flexShrink: 0 }} />
+                      <span style={{ fontFamily: "var(--font-sans)", fontWeight: 600, fontSize: "0.86rem" }}>
+                        Código de Barras
+                      </span>
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        setShowMenu(false);
+                        setShowRestaurantInfiltrator(true);
+                      }}
+                      style={{
+                        padding: "0.85rem 0.95rem",
+                        background: "rgba(245, 158, 11, 0.1)",
+                        border: "1px solid rgba(245, 158, 11, 0.35)",
+                        color: "#FBBF24",
+                        textAlign: "left",
+                        borderRadius: "12px",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "0.75rem"
+                      }}
+                    >
+                      <Utensils size={18} color="#FBBF24" style={{ flexShrink: 0 }} />
+                      <span style={{ fontFamily: "var(--font-sans)", fontWeight: 700, fontSize: "0.86rem" }}>
+                        Carta de Restaurante IA
+                      </span>
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        setShowMenu(false);
+                        router.push("/log");
+                      }}
+                      style={{
+                        padding: "0.85rem 0.95rem",
+                        background: "var(--primary-subtle)",
+                        border: "1px solid var(--primary-border)",
+                        color: "white",
+                        textAlign: "left",
+                        borderRadius: "12px",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "0.75rem"
+                      }}
+                    >
+                      <Mic size={18} color="var(--primary)" style={{ flexShrink: 0 }} />
+                      <span style={{ fontFamily: "var(--font-sans)", fontWeight: 600, fontSize: "0.86rem" }}>
+                        Diario Rápido / Voz IA
+                      </span>
+                    </button>
+                  </motion.div>
+                </>
+              )}
+            </AnimatePresence>
+
+            <AnimatePresence>
+              {showLiveScanner && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -796,13 +825,16 @@ export const FloatingScanner = () => {
             )}
           </motion.div>
         )}
-      </AnimatePresence>
+            </AnimatePresence>
 
-      <RestaurantInfiltratorModal
-        isOpen={showRestaurantInfiltrator}
-        onClose={() => setShowRestaurantInfiltrator(false)}
-        initialTab="scanner"
-      />
+            <RestaurantInfiltratorModal
+              isOpen={showRestaurantInfiltrator}
+              onClose={() => setShowRestaurantInfiltrator(false)}
+              initialTab="scanner"
+            />
+          </>,
+          document.body
+        )}
     </>
   );
 };

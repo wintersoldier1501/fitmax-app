@@ -1397,8 +1397,9 @@ export default function Workout() {
             style={{
               position: "fixed",
               bottom: "6.1rem",
-              left: "50%",
-              transform: "translateX(-50%)",
+              left: 0,
+              right: 0,
+              margin: "0 auto",
               width: "90%",
               maxWidth: "430px",
               background: "var(--bg-surface-solid)",
