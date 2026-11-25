@@ -1,7 +1,7 @@
 "use client";
 
 import { motion, AnimatePresence } from "framer-motion";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import styles from "./dashboard.module.css";
 import { RankCard } from "@/components/RankCard";
 import { MacroRing } from "@/components/MacroRing";
@@ -67,6 +67,25 @@ export default function Dashboard() {
   // Restaurant Infiltrator Modal state
   const [infiltratorOpen, setInfiltratorOpen] = useState(false);
   const [infiltratorTab, setInfiltratorTab] = useState<"scanner" | "banking">("scanner");
+  const [activeDraft, setActiveDraft] = useState<{ workoutTitle: string; completedCount: number } | null>(null);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const raw = localStorage.getItem("fitmax_workout_draft");
+      if (raw) {
+        const draft = JSON.parse(raw);
+        if (draft?.date === getLocalISODate() && draft?.completedCount > 0) {
+          setActiveDraft({
+            workoutTitle: draft.workoutTitle || "Sesión Activa",
+            completedCount: draft.completedCount
+          });
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
 
   // Check-in modal state
   const [showCheckIn, setShowCheckIn] = useState(false);
@@ -640,6 +659,52 @@ export default function Dashboard() {
           </div>
         </div>
       </motion.section>
+
+      {/* Active Workout Draft Resume Banner */}
+      {activeDraft && (
+        <motion.section
+          initial={{ opacity: 0, scale: 0.97 }}
+          animate={{ opacity: 1, scale: 1 }}
+        >
+          <Link
+            href="/workout"
+            className="glass-card"
+            style={{
+              padding: "0.9rem 1.05rem",
+              borderRadius: "14px",
+              border: "1px solid #10b981",
+              background: "linear-gradient(135deg, rgba(16, 185, 129, 0.16), rgba(0, 229, 255, 0.08))",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: "0.65rem",
+              textDecoration: "none"
+            }}
+          >
+            <div>
+              <span style={{ fontSize: "0.68rem", color: "#10b981", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.6px", display: "block" }}>
+                ⚡ Entreno en Curso (Autoguardado)
+              </span>
+              <span style={{ fontSize: "0.94rem", fontWeight: 800, color: "white" }}>
+                {activeDraft.workoutTitle} • {activeDraft.completedCount} series listas
+              </span>
+            </div>
+            <span
+              style={{
+                padding: "0.42rem 0.72rem",
+                borderRadius: "9px",
+                background: "#10b981",
+                color: "#000",
+                fontWeight: 800,
+                fontSize: "0.74rem",
+                whiteSpace: "nowrap"
+              }}
+            >
+              Reanudar →
+            </span>
+          </Link>
+        </motion.section>
+      )}
 
       {/* Workout Card */}
       <motion.section

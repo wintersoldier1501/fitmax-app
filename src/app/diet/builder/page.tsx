@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import styles from "./builder.module.css";
 import { useFitmax } from "@/context/FitmaxContext";
 import { useRouter } from "next/navigation";
-import { PiggyBank, Gem, Wand2, Loader2 } from "lucide-react";
+import { PiggyBank, Gem, Wand2, Loader2, Scale } from "lucide-react";
 
 // Simulated Food Database with math ratios
 const foodDB = {
@@ -37,6 +37,31 @@ const foodDB = {
       { id: "e_f4", name: "Mayonesa Light", icon: "🥣", unit: "cdas", ratio: 5 },
       { id: "e_f5", name: "Almendras", icon: "🌰", unit: "g", ratio: 0.50 },
       { id: "e_f6", name: "Medio Aguacate", icon: "🥑", unit: "pz", ratio: 15 },
+    ]
+  },
+  estandar: {
+    protein: [
+      { id: "s_p1", name: "Pechuga de Pollo", icon: "🍗", unit: "g", ratio: 0.31 },
+      { id: "s_p2", name: "Carne Molida 93/7", icon: "🥩", unit: "g", ratio: 0.22 },
+      { id: "s_p3", name: "Filete de Tilapia/Basa", icon: "🐟", unit: "g", ratio: 0.26 },
+      { id: "s_p4", name: "Huevos + Claras", icon: "🍳", unit: "pz", ratio: 7 },
+      { id: "s_p5", name: "Yogurt Griego Oikos", icon: "🍦", unit: "tazas", ratio: 22 },
+      { id: "s_p6", name: "Whey Protein", icon: "🥤", unit: "scoops", ratio: 24 },
+      { id: "s_p7", name: "Queso Oaxaca Light", icon: "🧀", unit: "g", ratio: 0.24 },
+    ],
+    carbs: [
+      { id: "s_c1", name: "Arroz Jazmín", icon: "🍚", unit: "g", ratio: 0.28 },
+      { id: "s_c2", name: "Camote Cocido", icon: "🍠", unit: "g", ratio: 0.20 },
+      { id: "s_c3", name: "Tortillas de Maíz", icon: "🌮", unit: "pz", ratio: 15 },
+      { id: "s_c4", name: "Pasta Integral", icon: "🍝", unit: "tazas", ratio: 40 },
+      { id: "s_c5", name: "Pan Integral", icon: "🍞", unit: "rebanadas", ratio: 13 },
+      { id: "s_c6", name: "Fruta de Temporada", icon: "🍌", unit: "pz", ratio: 25 },
+    ],
+    fats: [
+      { id: "s_f1", name: "Aguacate Hass", icon: "🥑", unit: "pz", ratio: 28 },
+      { id: "s_f2", name: "Aceite de Oliva Extra", icon: "🫒", unit: "cdas", ratio: 14 },
+      { id: "s_f3", name: "Nueces Mixtas", icon: "🌰", unit: "g", ratio: 0.55 },
+      { id: "s_f4", name: "Crema de Cacahuate Nat.", icon: "🥜", unit: "cdas", ratio: 8 },
     ]
   },
   premium: {
@@ -72,8 +97,8 @@ export default function DietBuilder() {
   const { isLoaded, profile, targetMacros, saveDiet, showToast } = useFitmax();
 
   const [step, setStep] = useState(0); // 0: Budget, 1: Preferences
-  const [budget, setBudget] = useState<"economico" | "premium">(
-    profile.budget === "Premium" ? "premium" : "economico"
+  const [budget, setBudget] = useState<"economico" | "estandar" | "premium">(
+    profile.budget === "Premium" ? "premium" : profile.budget === "Estándar" ? "estandar" : "economico"
   );
   
   const [selections, setSelections] = useState<any>({
@@ -299,7 +324,7 @@ export default function DietBuilder() {
     ];
 
     saveDiet({
-      budget: budget === "economico" ? "Económico" : "Premium",
+      budget: budget === "economico" ? "Económico" : budget === "estandar" ? "Estándar" : "Premium",
       totalCalories: targetMacros.calories,
       meals: meals
     });
@@ -374,6 +399,22 @@ export default function DietBuilder() {
                 </div>
               </div>
               
+              <div 
+                className={`glass-card ${styles.budgetOption} ${budget === "estandar" ? styles.selected : ""}`}
+                onClick={() => setBudget("estandar")}
+                style={{ padding: "1.5rem", border: `2px solid ${budget === "estandar" ? "var(--accent)" : "transparent"}`, cursor: "pointer", transition: "all 0.3s" }}
+              >
+                <div style={{ display: "flex", justifyContent: "center", marginBottom: "1rem" }}>
+                  <span style={{ padding: "1rem", background: "rgba(16, 185, 129, 0.12)", borderRadius: "50%", color: "#10b981" }}>
+                    <Scale size={32} />
+                  </span>
+                </div>
+                <div className={styles.budgetText} style={{ textAlign: "center" }}>
+                  <h3 style={{ color: "white", marginBottom: "0.5rem", fontFamily: "var(--font-display)" }}>Estándar Balanceado</h3>
+                  <p style={{ color: "var(--text-muted)", fontSize: "0.9rem" }}>Pollo, res magra 93/7, pescado, whey, aguacate.</p>
+                </div>
+              </div>
+
               <div 
                 className={`glass-card ${styles.budgetOption} ${budget === "premium" ? styles.selected : ""}`}
                 onClick={() => setBudget("premium")}

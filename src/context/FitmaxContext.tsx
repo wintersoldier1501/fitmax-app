@@ -192,7 +192,10 @@ interface FitmaxState {
   updateAvatar: (base64String: string) => void;
   updateName: (newName: string) => void;
   addFoodLog: (food: FoodLog) => void;
+  updateFoodLog: (id: string, updatedMacros: Macros, updatedName?: string) => void;
   removeFoodLog: (id: string) => void;
+  exportBackupData: () => string;
+  importBackupData: (rawJson: string) => boolean;
   toggleFavoriteMeal: (food: FoodLog) => void;
   repeatYesterdayMeals: () => void;
   waterGlasses: number;
@@ -506,6 +509,10 @@ export const FitmaxProvider = ({ children }: { children: ReactNode }) => {
     setYesterdayFoods(savedYesterday);
     setDailyHistory(savedDailyHistory);
     setIsLoaded(true);
+
+    if (typeof window !== "undefined" && "serviceWorker" in navigator) {
+      navigator.serviceWorker.register("/sw.js").catch(() => {});
+    }
   }, []);
 
   // Handle Firebase Auth and Cloud Sync
@@ -897,6 +904,33 @@ export const FitmaxProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const updateFoodLog = (id: string, updatedMacros: Macros, updatedName?: string) => {
+    const existing = loggedFoods.find((f) => f.id === id);
+    if (!existing) return;
+
+    const p = Math.max(0, Math.round(updatedMacros.protein || 0));
+    const c = Math.max(0, Math.round(updatedMacros.carbs || 0));
+    const f = Math.max(0, Math.round(updatedMacros.fats || 0));
+    const cal = Math.max(0, Math.round(updatedMacros.calories || p * 4 + c * 4 + f * 9));
+    const nextMacros: Macros = { protein: p, carbs: c, fats: f, calories: cal };
+
+    setCurrentMacros((prev) => ({
+      protein: Math.max(0, prev.protein - existing.macros.protein + nextMacros.protein),
+      carbs: Math.max(0, prev.carbs - existing.macros.carbs + nextMacros.carbs),
+      fats: Math.max(0, prev.fats - existing.macros.fats + nextMacros.fats),
+      calories: Math.max(0, prev.calories - existing.macros.calories + nextMacros.calories)
+    }));
+
+    setLoggedFoods((prev) =>
+      prev.map((item) =>
+        item.id === id
+          ? { ...item, name: updatedName?.trim() || item.name, macros: nextMacros }
+          : item
+      )
+    );
+    showToast("✏️ Comida y macros actualizados", "success");
+  };
+
   const toggleFavoriteMeal = (food: FoodLog) => {
     const norm = food.name.toLowerCase().trim();
     const exists = favoriteMeals.some((f) => f.name.toLowerCase().trim() === norm);
@@ -1148,6 +1182,71 @@ export const FitmaxProvider = ({ children }: { children: ReactNode }) => {
     showToast("Registro diario reiniciado", "warning");
   };
 
+  const exportBackupData = (): string => {
+    return JSON.stringify(
+      {
+        version: "fitmax-backup-v1",
+        exportedAt: new Date().toISOString(),
+        profile,
+        targetMacros,
+        currentMacros,
+        loggedFoods,
+        favoriteMeals,
+        customDiet,
+        customWorkoutPlan,
+        xp,
+        streak,
+        streakShields,
+        biometrics,
+        activeTheme,
+        dailyHistory,
+        weightHistory,
+        workoutHistory,
+        exercisePRs,
+        cardioHistory
+      },
+      null,
+      2
+    );
+  };
+
+  const importBackupData = (rawJson: string): boolean => {
+    try {
+      const data = JSON.parse(rawJson);
+      if (!data || typeof data !== "object" || (data.version !== "fitmax-backup-v1" && !data.profile)) {
+        showToast("Archivo de respaldo inválido", "error");
+        return false;
+      }
+
+      if (data.profile) setProfile(data.profile);
+      if (data.targetMacros) setTargetMacros(data.targetMacros);
+      if (data.currentMacros) setCurrentMacros(data.currentMacros);
+      if (Array.isArray(data.loggedFoods)) setLoggedFoods(data.loggedFoods);
+      if (Array.isArray(data.favoriteMeals)) setFavoriteMeals(data.favoriteMeals);
+      if (data.customDiet !== undefined) setCustomDiet(data.customDiet);
+      if (data.customWorkoutPlan !== undefined) setCustomWorkoutPlan(data.customWorkoutPlan);
+      if (typeof data.xp === "number") setXp(data.xp);
+      if (typeof data.streak === "number") setStreak(data.streak);
+      if (typeof data.streakShields === "number") setStreakShields(data.streakShields);
+      if (data.biometrics) setBiometrics(data.biometrics);
+      if (Array.isArray(data.dailyHistory)) setDailyHistory(data.dailyHistory);
+      if (Array.isArray(data.weightHistory)) setWeightHistory(data.weightHistory);
+      if (Array.isArray(data.workoutHistory)) setWorkoutHistory(data.workoutHistory);
+      if (data.exercisePRs) setExercisePRs(data.exercisePRs);
+      if (Array.isArray(data.cardioHistory)) setCardioHistory(data.cardioHistory);
+      if (typeof data.activeTheme === "string" && data.activeTheme) {
+        setActiveTheme(data.activeTheme);
+        document.documentElement.setAttribute("data-theme", data.activeTheme);
+      }
+
+      showToast("📦 Respaldo Fitmax restaurado con éxito", "success");
+      return true;
+    } catch {
+      showToast("Archivo de respaldo inválido", "error");
+      return false;
+    }
+  };
+
   return (
     <FitmaxContext.Provider
       value={{
@@ -1187,7 +1286,10 @@ export const FitmaxProvider = ({ children }: { children: ReactNode }) => {
         updateAvatar,
         updateName,
         addFoodLog,
+        updateFoodLog,
         removeFoodLog,
+        exportBackupData,
+        importBackupData,
         toggleFavoriteMeal,
         repeatYesterdayMeals,
         waterGlasses,

@@ -16,7 +16,7 @@ const quickTags = [
 ];
 
 export default function DietCenter() {
-  const { isLoaded, customDiet, currentMacros, targetMacros, profile, todaySocialBank, addFoodLog, showToast } = useFitmax();
+  const { isLoaded, customDiet, currentMacros, targetMacros, profile, todaySocialBank, loggedFoods, addFoodLog, showToast } = useFitmax();
   const router = useRouter();
 
   // Infiltrator Modal State
@@ -452,30 +452,79 @@ export default function DietCenter() {
           </div>
 
           <div>
-            {customDiet.meals.map((meal: any, index: number) => (
-              <div key={index} className="glass-card" style={{ padding: "1.3rem", marginBottom: "1rem" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.9rem", borderBottom: "1px solid var(--border)", paddingBottom: "0.8rem" }}>
-                  <h3 style={{ fontSize: "1.1rem", margin: 0, color: "white", fontFamily: "var(--font-display)" }}>{meal.name}</h3>
-                  <div style={{ display: "flex", gap: "0.4rem", fontSize: "0.72rem", fontWeight: "bold" }}>
-                    <span style={{ background: "var(--primary-subtle)", color: "var(--primary)", padding: "0.25rem 0.5rem", borderRadius: "8px", border: "1px solid var(--primary-border)" }}>{meal.macros.protein}g P</span>
-                    <span style={{ background: "var(--accent-subtle)", color: "var(--accent)", padding: "0.25rem 0.5rem", borderRadius: "8px", border: "1px solid var(--accent-border)" }}>{meal.macros.carbs}g C</span>
-                    <span style={{ background: "rgba(255,215,0,0.1)", color: "#FFD700", padding: "0.25rem 0.5rem", borderRadius: "8px", border: "1px solid rgba(255,215,0,0.2)" }}>{meal.macros.fats}g G</span>
-                  </div>
-                </div>
+            {customDiet.meals.map((meal: any, index: number) => {
+              const mealP = Math.round(Number(meal.macros?.protein) || 0);
+              const mealC = Math.round(Number(meal.macros?.carbs) || 0);
+              const mealF = Math.round(Number(meal.macros?.fats) || 0);
+              const mealCals = Math.round(Number(meal.macros?.calories) || mealP * 4 + mealC * 4 + mealF * 9);
+              const alreadyLogged = loggedFoods.some((f) => f.name.startsWith(`📋 ${meal.name}`));
 
-                <div style={{ display: "flex", flexDirection: "column", gap: "0.7rem" }}>
-                  {meal.foods.map((food: any, fIndex: number) => (
-                    <div key={fIndex} style={{ display: "flex", alignItems: "center", gap: "0.9rem", background: "rgba(0,0,0,0.22)", padding: "0.9rem", borderRadius: "12px", border: "1px solid var(--border)" }}>
-                      <span style={{ fontSize: "1.7rem", background: "var(--bg-surface-solid)", padding: "0.45rem", borderRadius: "10px", display: "flex", alignItems: "center", justifyContent: "center", width: "44px", height: "44px" }}>{food.icon}</span>
-                      <div style={{ flex: 1 }}>
-                        <p style={{ margin: 0, fontWeight: "bold", fontSize: "0.95rem", color: "white" }}>{food.name}</p>
-                        <p style={{ margin: 0, color: "var(--text-muted)", fontSize: "0.82rem", marginTop: "0.15rem" }}>Porción exacta: {food.amount}</p>
-                      </div>
+              return (
+                <div key={index} className="glass-card" style={{ padding: "1.3rem", marginBottom: "1rem" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.9rem", borderBottom: "1px solid var(--border)", paddingBottom: "0.8rem" }}>
+                    <h3 style={{ fontSize: "1.1rem", margin: 0, color: "white", fontFamily: "var(--font-display)" }}>{meal.name}</h3>
+                    <div style={{ display: "flex", gap: "0.4rem", fontSize: "0.72rem", fontWeight: "bold" }}>
+                      <span style={{ background: "var(--primary-subtle)", color: "var(--primary)", padding: "0.25rem 0.5rem", borderRadius: "8px", border: "1px solid var(--primary-border)" }}>{mealP}g P</span>
+                      <span style={{ background: "var(--accent-subtle)", color: "var(--accent)", padding: "0.25rem 0.5rem", borderRadius: "8px", border: "1px solid var(--accent-border)" }}>{mealC}g C</span>
+                      <span style={{ background: "rgba(255,215,0,0.1)", color: "#FFD700", padding: "0.25rem 0.5rem", borderRadius: "8px", border: "1px solid rgba(255,215,0,0.2)" }}>{mealF}g G</span>
                     </div>
-                  ))}
+                  </div>
+
+                  <div style={{ display: "flex", flexDirection: "column", gap: "0.7rem" }}>
+                    {meal.foods.map((food: any, fIndex: number) => (
+                      <div key={fIndex} style={{ display: "flex", alignItems: "center", gap: "0.9rem", background: "rgba(0,0,0,0.22)", padding: "0.9rem", borderRadius: "12px", border: "1px solid var(--border)" }}>
+                        <span style={{ fontSize: "1.7rem", background: "var(--bg-surface-solid)", padding: "0.45rem", borderRadius: "10px", display: "flex", alignItems: "center", justifyContent: "center", width: "44px", height: "44px" }}>{food.icon}</span>
+                        <div style={{ flex: 1 }}>
+                          <p style={{ margin: 0, fontWeight: "bold", fontSize: "0.95rem", color: "white" }}>{food.name}</p>
+                          <p style={{ margin: 0, color: "var(--text-muted)", fontSize: "0.82rem", marginTop: "0.15rem" }}>Porción exacta: {food.amount}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <button
+                    onClick={() =>
+                      addFoodLog({
+                        id: `${Date.now()}_${index}`,
+                        name: `📋 ${meal.name}: ${(meal.foods || []).map((f: any) => f.name).slice(0, 2).join(" + ")}`,
+                        time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+                        macros: {
+                          protein: mealP,
+                          carbs: mealC,
+                          fats: mealF,
+                          calories: mealCals
+                        }
+                      })
+                    }
+                    style={{
+                      marginTop: "0.85rem",
+                      width: "100%",
+                      padding: "0.68rem",
+                      borderRadius: "10px",
+                      background: alreadyLogged ? "rgba(16, 185, 129, 0.14)" : "var(--primary-subtle)",
+                      border: alreadyLogged ? "1px solid #10b981" : "1px solid var(--primary-border)",
+                      color: alreadyLogged ? "#10b981" : "var(--primary)",
+                      fontWeight: 800,
+                      fontSize: "0.8rem",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: "0.35rem"
+                    }}
+                  >
+                    {alreadyLogged ? (
+                      <>
+                        <Check size={14} /> Registrado Hoy (Sumar otra vez)
+                      </>
+                    ) : (
+                      <>
+                        <Plus size={14} /> Registrar {meal.name} (~{mealCals} kcal) +50 XP
+                      </>
+                    )}
+                  </button>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           <button

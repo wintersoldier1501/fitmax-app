@@ -3,8 +3,9 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useRef, useEffect } from "react";
 import { useFitmax, compressThumbnail } from "@/context/FitmaxContext";
+import { RestaurantInfiltratorModal } from "./RestaurantInfiltratorModal";
 import { useRouter } from "next/navigation";
-import { Camera, ScanBarcode, FileText, Mic, X } from "lucide-react";
+import { Camera, ScanBarcode, FileText, Mic, X, Utensils, Sparkles, Loader2 } from "lucide-react";
 import { Html5QrcodeScanner } from "html5-qrcode";
 
 const BarcodeScannerComponent = ({ onScanSuccess, onScanError }: any) => {
@@ -46,6 +47,9 @@ export const FloatingScanner = () => {
   const [showMenu, setShowMenu] = useState(false);
   const [scanMode, setScanMode] = useState<"meal" | "label">("meal");
   const [showLiveScanner, setShowLiveScanner] = useState(false);
+  const [showRestaurantInfiltrator, setShowRestaurantInfiltrator] = useState(false);
+  const [visionAssistedHint, setVisionAssistedHint] = useState("");
+  const [isAssistingText, setIsAssistingText] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const scanModeRef = useRef<"meal" | "label">("meal");
 
@@ -91,9 +95,24 @@ export const FloatingScanner = () => {
             });
             const data = await res.json();
 
-            if (data.error) {
-              showToast(data.error, "error");
+            if (data.error || (!data.calories && !data.protein && !data.name)) {
+              const fallbackMacros = { protein: 32, carbs: 35, fats: 12, calories: 376 };
+              setPortionScale(1);
+              setVisionAssistedHint("");
+              setScannedFood({
+                id: Date.now().toString(),
+                name: activeMode === "label" ? "Producto de Etiqueta" : "Platillo Fotografiado",
+                time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+                baseMacros: fallbackMacros,
+                macros: fallbackMacros,
+                items: [],
+                image: thumb,
+                assistedFallback: true
+              });
+              setShowConfirm(true);
+              showToast("Cuota visual ocupada: escribe 3 palabras o ajusta los macros", "warning");
               setIsScanning(false);
+              if (fileInputRef.current) fileInputRef.current.value = "";
               return;
             }
 
@@ -105,6 +124,7 @@ export const FloatingScanner = () => {
             };
 
             setPortionScale(1);
+            setVisionAssistedHint("");
             setScannedFood({
               id: Date.now().toString(),
               name: data.name || (activeMode === "label" ? "Etiqueta Escaneada" : "Platillo Escaneado"),
@@ -112,11 +132,26 @@ export const FloatingScanner = () => {
               baseMacros,
               macros: baseMacros,
               items: Array.isArray(data.items) ? data.items : [],
-              image: thumb
+              image: thumb,
+              assistedFallback: false
             });
             setShowConfirm(true);
           } catch {
-            showToast("Error analizando la imagen. Revisa tu conexión.", "error");
+            const fallbackMacros = { protein: 30, carbs: 35, fats: 12, calories: 368 };
+            setPortionScale(1);
+            setVisionAssistedHint("");
+            setScannedFood({
+              id: Date.now().toString(),
+              name: activeMode === "label" ? "Producto de Etiqueta" : "Platillo Fotografiado",
+              time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+              baseMacros: fallbackMacros,
+              macros: fallbackMacros,
+              items: [],
+              image: thumb,
+              assistedFallback: true
+            });
+            setShowConfirm(true);
+            showToast("Sin conexión visual: calibración asistida activada", "warning");
           } finally {
             setIsScanning(false);
             if (fileInputRef.current) fileInputRef.current.value = "";
@@ -193,6 +228,44 @@ export const FloatingScanner = () => {
       showToast("Error de conexión al buscar el código de barras.", "error");
     } finally {
       setIsScanning(false);
+    }
+  };
+
+  const handleAssistCalibrate = async () => {
+    if (!visionAssistedHint.trim() || !scannedFood) return;
+    setIsAssistingText(true);
+    try {
+      const res = await fetch("/api/food/parse", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: visionAssistedHint.trim() })
+      });
+      const data = await res.json();
+      if (data.totalMacros) {
+        const nextBase = {
+          protein: Math.round(data.totalMacros.protein || 0),
+          carbs: Math.round(data.totalMacros.carbs || 0),
+          fats: Math.round(data.totalMacros.fats || 0),
+          calories: Math.round(data.totalMacros.calories || 0)
+        };
+        setPortionScale(1);
+        setScannedFood({
+          ...scannedFood,
+          name:
+            Array.isArray(data.items) && data.items.length > 0
+              ? data.items.map((i: any) => i.name).slice(0, 3).join(" + ")
+              : visionAssistedHint.trim(),
+          baseMacros: nextBase,
+          macros: nextBase,
+          items: Array.isArray(data.items) ? data.items : [],
+          assistedFallback: false
+        });
+        showToast("✨ Macros calibrados por IA", "success");
+      }
+    } catch {
+      showToast("No se pudo calibrar por texto; ajusta los números abajo", "warning");
+    } finally {
+      setIsAssistingText(false);
     }
   };
 
@@ -320,6 +393,29 @@ export const FloatingScanner = () => {
                 <ScanBarcode size={18} color="var(--primary)" />
                 <span style={{ fontFamily: "var(--font-sans)", fontWeight: 600, fontSize: "0.86rem" }}>
                   Código de Barras
+                </span>
+              </button>
+
+              <button
+                onClick={() => {
+                  setShowMenu(false);
+                  setShowRestaurantInfiltrator(true);
+                }}
+                style={{
+                  padding: "0.85rem 0.9rem",
+                  background: "rgba(245, 158, 11, 0.1)",
+                  border: "1px solid rgba(245, 158, 11, 0.35)",
+                  color: "#FBBF24",
+                  textAlign: "left",
+                  borderRadius: "12px",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.75rem"
+                }}
+              >
+                <Utensils size={18} color="#FBBF24" />
+                <span style={{ fontFamily: "var(--font-sans)", fontWeight: 700, fontSize: "0.86rem" }}>
+                  Carta de Restaurante IA
                 </span>
               </button>
 
@@ -520,6 +616,50 @@ export const FloatingScanner = () => {
                   }}
                 />
 
+                {scannedFood.assistedFallback && (
+                  <div
+                    style={{
+                      textAlign: "left",
+                      background: "rgba(245, 158, 11, 0.1)",
+                      border: "1px solid rgba(245, 158, 11, 0.32)",
+                      borderRadius: "12px",
+                      padding: "0.65rem",
+                      marginBottom: "0.95rem"
+                    }}
+                  >
+                    <span style={{ display: "block", fontSize: "0.72rem", color: "#FBBF24", fontWeight: 700, marginBottom: "0.35rem" }}>
+                      ⚡ Estimación Asistida: escribe qué es tu foto (ej. &quot;pechuga con arroz&quot;) o ajusta los gramos abajo:
+                    </span>
+                    <div style={{ display: "flex", gap: "0.35rem" }}>
+                      <input
+                        type="text"
+                        value={visionAssistedHint}
+                        onChange={(e) => setVisionAssistedHint(e.target.value)}
+                        onKeyDown={(e) => e.key === "Enter" && handleAssistCalibrate()}
+                        placeholder="Ej. 2 tacos de bistec con aguacate"
+                        style={{ flex: 1, padding: "0.45rem 0.6rem", fontSize: "0.78rem", background: "var(--bg-dark)", borderRadius: "8px" }}
+                      />
+                      <button
+                        onClick={handleAssistCalibrate}
+                        disabled={isAssistingText || !visionAssistedHint.trim()}
+                        style={{
+                          padding: "0.45rem 0.7rem",
+                          borderRadius: "8px",
+                          background: "#F59E0B",
+                          color: "#000",
+                          fontWeight: 800,
+                          fontSize: "0.74rem",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "0.25rem"
+                        }}
+                      >
+                        {isAssistingText ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} />} Calibrar
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 {/* Portion Scale Pills */}
                 <div style={{ marginBottom: "1.1rem" }}>
                   <p style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginBottom: "0.45rem" }}>
@@ -657,6 +797,12 @@ export const FloatingScanner = () => {
           </motion.div>
         )}
       </AnimatePresence>
+
+      <RestaurantInfiltratorModal
+        isOpen={showRestaurantInfiltrator}
+        onClose={() => setShowRestaurantInfiltrator(false)}
+        initialTab="scanner"
+      />
     </>
   );
 };

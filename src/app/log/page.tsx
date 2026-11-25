@@ -5,7 +5,7 @@ import { useState, useEffect, useRef } from "react";
 import styles from "./log.module.css";
 import { useFitmax } from "@/context/FitmaxContext";
 import { RestaurantInfiltratorModal } from "@/components/RestaurantInfiltratorModal";
-import { Search, Loader2, Trash2, Mic, MicOff, Sparkles, Brain, Check, Plus, RotateCcw, Star, Repeat, Utensils, Shield } from "lucide-react";
+import { Search, Loader2, Trash2, Mic, MicOff, Sparkles, Brain, Check, Plus, RotateCcw, Star, Repeat, Utensils, Shield, Edit2 } from "lucide-react";
 import Link from "next/link";
 
 export default function DiaryLog() {
@@ -16,6 +16,7 @@ export default function DiaryLog() {
     yesterdayFoods,
     resetProgress,
     addFoodLog,
+    updateFoodLog,
     removeFoodLog,
     toggleFavoriteMeal,
     repeatYesterdayMeals,
@@ -50,9 +51,12 @@ export default function DiaryLog() {
   const [soreness, setSoreness] = useState<number>(todayReadiness?.soreness ?? 4);
   const [readinessNote, setReadinessNote] = useState<string>(todayReadiness?.note ?? "");
 
-  // Inline Delete / Reset confirmation state
+  // Inline Delete / Reset / Edit confirmation state
   const [confirmReset, setConfirmReset] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [editingFoodId, setEditingFoodId] = useState<string | null>(null);
+  const [editMacros, setEditMacros] = useState<{ protein: number; carbs: number; fats: number }>({ protein: 0, carbs: 0, fats: 0 });
+  const [editBaseMacros, setEditBaseMacros] = useState<{ protein: number; carbs: number; fats: number }>({ protein: 0, carbs: 0, fats: 0 });
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -835,6 +839,36 @@ export default function DiaryLog() {
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
+                          if (editingFoodId === food.id) {
+                            setEditingFoodId(null);
+                          } else {
+                            const base = {
+                              protein: food.macros.protein || 0,
+                              carbs: food.macros.carbs || 0,
+                              fats: food.macros.fats || 0
+                            };
+                            setEditBaseMacros(base);
+                            setEditMacros(base);
+                            setEditingFoodId(food.id);
+                          }
+                        }}
+                        style={{
+                          background: editingFoodId === food.id ? "var(--accent-subtle)" : "rgba(255,255,255,0.05)",
+                          border: editingFoodId === food.id ? "1px solid var(--accent-border)" : "1px solid var(--border)",
+                          color: editingFoodId === food.id ? "var(--accent)" : "var(--text-muted)",
+                          borderRadius: "8px",
+                          padding: "0.35rem 0.5rem",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center"
+                        }}
+                        title="Editar porción o macros"
+                      >
+                        <Edit2 size={14} />
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
                           setConfirmDeleteId(food.id);
                         }}
                         style={{
@@ -873,6 +907,106 @@ export default function DiaryLog() {
                     <span className={styles.macroLabel}>kcal</span>
                   </div>
                 </div>
+
+                {editingFoodId === food.id && (
+                  <div
+                    style={{
+                      marginTop: "0.65rem",
+                      padding: "0.7rem",
+                      borderRadius: "10px",
+                      background: "rgba(0,0,0,0.35)",
+                      border: "1px solid var(--accent-border)",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "0.55rem"
+                    }}
+                  >
+                    <div style={{ display: "flex", gap: "0.3rem", flexWrap: "wrap" }}>
+                      {[0.5, 0.75, 1, 1.25, 1.5, 2].map((mult) => (
+                        <button
+                          key={mult}
+                          onClick={() =>
+                            setEditMacros({
+                              protein: Math.round(editBaseMacros.protein * mult),
+                              carbs: Math.round(editBaseMacros.carbs * mult),
+                              fats: Math.round(editBaseMacros.fats * mult)
+                            })
+                          }
+                          style={{
+                            padding: "0.22rem 0.48rem",
+                            borderRadius: "6px",
+                            fontSize: "0.7rem",
+                            fontWeight: 700,
+                            background: "rgba(255,255,255,0.06)",
+                            border: "1px solid var(--border)",
+                            color: "var(--accent)"
+                          }}
+                        >
+                          {mult}x
+                        </button>
+                      ))}
+                    </div>
+
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "0.4rem" }}>
+                      <div>
+                        <span style={{ fontSize: "0.64rem", color: "var(--primary)", fontWeight: 700 }}>Prot (g)</span>
+                        <input
+                          type="number"
+                          min="0"
+                          value={editMacros.protein}
+                          onChange={(e) => setEditMacros({ ...editMacros, protein: Math.max(0, Number(e.target.value) || 0) })}
+                          style={{ width: "100%", padding: "0.32rem", fontSize: "0.82rem", textAlign: "center" }}
+                        />
+                      </div>
+                      <div>
+                        <span style={{ fontSize: "0.64rem", color: "var(--accent)", fontWeight: 700 }}>Carb (g)</span>
+                        <input
+                          type="number"
+                          min="0"
+                          value={editMacros.carbs}
+                          onChange={(e) => setEditMacros({ ...editMacros, carbs: Math.max(0, Number(e.target.value) || 0) })}
+                          style={{ width: "100%", padding: "0.32rem", fontSize: "0.82rem", textAlign: "center" }}
+                        />
+                      </div>
+                      <div>
+                        <span style={{ fontSize: "0.64rem", color: "#FFD700", fontWeight: 700 }}>Grasa (g)</span>
+                        <input
+                          type="number"
+                          min="0"
+                          value={editMacros.fats}
+                          onChange={(e) => setEditMacros({ ...editMacros, fats: Math.max(0, Number(e.target.value) || 0) })}
+                          style={{ width: "100%", padding: "0.32rem", fontSize: "0.82rem", textAlign: "center" }}
+                        />
+                      </div>
+                    </div>
+
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "0.4rem" }}>
+                      <span style={{ fontSize: "0.72rem", color: "var(--text-muted)" }}>
+                        Total: <strong style={{ color: "white" }}>{editMacros.protein * 4 + editMacros.carbs * 4 + editMacros.fats * 9} kcal</strong>
+                      </span>
+                      <div style={{ display: "flex", gap: "0.35rem" }}>
+                        <button
+                          onClick={() => setEditingFoodId(null)}
+                          style={{ padding: "0.32rem 0.6rem", borderRadius: "7px", background: "transparent", border: "1px solid var(--border)", color: "var(--text-muted)", fontSize: "0.72rem" }}
+                        >
+                          Cancelar
+                        </button>
+                        <button
+                          onClick={() => {
+                            updateFoodLog(food.id, {
+                              ...editMacros,
+                              calories: editMacros.protein * 4 + editMacros.carbs * 4 + editMacros.fats * 9
+                            });
+                            setEditingFoodId(null);
+                          }}
+                          style={{ padding: "0.32rem 0.65rem", borderRadius: "7px", background: "var(--primary)", color: "white", fontWeight: 800, fontSize: "0.72rem" }}
+                        >
+                          Guardar
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </motion.div>
           ))}

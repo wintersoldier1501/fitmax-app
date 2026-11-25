@@ -26,6 +26,18 @@ function generateCoachFallback(
     return `¡Excelente hidratación, ${name}! Vamos a sumar **2 vasos de agua (500 ml)** a tu marcador diario.\n\n<<<ACTION:{"type":"ADD_WATER","payload":{"glasses":2}}>>>`;
   }
 
+  if (msg.includes("blindar") || ((msg.includes("reserv") || msg.includes("cena") || msg.includes("fiesta") || msg.includes("boda")) && (msg.includes("kcal") || msg.includes("calor")))) {
+    const kcalMatch = msg.match(/(\d{3,4})/);
+    const reserveKcal = kcalMatch ? Math.max(400, Math.min(1600, parseInt(kcalMatch[1], 10))) : 900;
+    return `¡Estrategia de **Escudo Social** lista, ${name}! Reservaremos **${reserveKcal} kcal** para tu evento nocturno mientras protegemos al 100% tu proteína diaria.\n\n<<<ACTION:{"type":"ACTIVATE_SOCIAL_BANK","payload":{"reservedCalories":${reserveKcal},"eventName":"Evento / Cena Social"}}>>>`;
+  }
+
+  if (msg.includes("paso") && /\d{3,5}/.test(msg)) {
+    const stepMatch = msg.replace(/,/g, "").match(/(\d{3,5})/);
+    const stepsNum = stepMatch ? Math.max(500, parseInt(stepMatch[1], 10)) : 8000;
+    return `¡Excelente NEAT, ${name}! Pulsa abajo para registrar **${stepsNum.toLocaleString()} pasos** en tu marcador de actividad híbrida hoy.\n\n<<<ACTION:{"type":"SET_STEPS","payload":{"steps":${stepsNum}}}>>>`;
+  }
+
   if (msg === "hola" || msg === "buenos dias" || msg === "buenas tardes" || msg === "buenas noches" || msg === "hey" || msg === "que tal" || msg === "coach") {
     return `¡Hola ${name}! Aquí tu Coach Fitmax. Hoy tu meta es **${goal}**. Llevas consumidos **${currentMacros?.protein || 0}g de proteína** y te faltan **${pDiff}g** (${calRemaining} kcal disponibles). ¿En qué trabajamos hoy?`;
   }
@@ -71,7 +83,13 @@ export async function POST(req: Request) {
       waterGlasses,
       todayReadiness,
       customWorkoutPlan,
-      streak
+      streak,
+      biometrics,
+      dailySteps,
+      stepsGoal,
+      exercisePRs,
+      recentWorkoutsCount,
+      todaySocialBank
     } = await req.json();
 
     const lastMessage = messages && messages.length > 0 ? messages[messages.length - 1].text : "";
@@ -89,16 +107,35 @@ export async function POST(req: Request) {
       ? `${todayReadiness.score}% (Sueño: ${todayReadiness.sleepHours}h, Calidad: ${todayReadiness.sleepQuality}/10, Fatiga: ${todayReadiness.fatigue}/10)`
       : "No evaluado hoy";
 
+    const topPRsSummary =
+      exercisePRs && Object.keys(exercisePRs).length > 0
+        ? Object.entries(exercisePRs)
+            .sort((a: any, b: any) => (b[1]?.best1RM || 0) - (a[1]?.best1RM || 0))
+            .slice(0, 3)
+            .map(([n, pr]: any) => `${n}: ${pr.weight}kg×${pr.reps} (1RM est. ${pr.best1RM}kg)`)
+            .join(" | ")
+        : "Aún sin PRs registrados";
+
+    const biometricsSummary = biometrics?.bodyFatPercentage
+      ? `${biometrics.bodyFatPercentage}% grasa corporal, ${biometrics.leanMass} kg masa magra`
+      : "Sin pliegues/US Navy capturados";
+
+    const socialBankSummary = todaySocialBank?.active
+      ? `Activo: ${todaySocialBank.reservedCalories} kcal para "${todaySocialBank.eventName}" (${todaySocialBank.released ? "Liberado" : "Blindado"})`
+      : "Inactivo";
+
     const systemPrompt = `
 Eres el Coach IA Agéntico oficial de Fitmax: entrenador personal de élite, preparador físico basado en ciencia (Schoenfeld, Israetel, Helms) y nutricionista deportivo.
 
 Contexto en tiempo real del alumno:
 - Nombre: ${profile?.name || "Guerrero"} | Meta: ${profile?.goal || "Mejorar físico"} | Racha: ${streak || 0} días
-- Datos: ${profile?.sex || "H"}, ${profile?.age || 25} años, ${profile?.weight || 75} kg
+- Datos: ${profile?.sex || "H"}, ${profile?.age || 25} años, ${profile?.weight || 75} kg (${biometricsSummary})
 - Macros consumidos hoy: ${currentMacros?.protein || 0}g Proteína, ${currentMacros?.carbs || 0}g Carbos, ${currentMacros?.fats || 0}g Grasas (${currentMacros?.calories || 0} kcal)
 - Meta diaria: ${targetMacros?.protein || 150}g Proteína, ${targetMacros?.carbs || 200}g Carbos, ${targetMacros?.fats || 60}g Grasas (${targetMacros?.calories || 2000} kcal)
-- Hidratación hoy: ${(waterGlasses || 0) * 250} ml
+- Hidratación hoy: ${(waterGlasses || 0) * 250} ml | Pasos NEAT hoy: ${dailySteps || 0} / ${stepsGoal || 10000}
+- Escudo Social hoy: ${socialBankSummary}
 - Readiness / Recuperación hoy: ${readinessSummary}
+- Entrenos recientes (últimos registros): ${recentWorkoutsCount ?? 0} | Top PRs: ${topPRsSummary}
 - Split activo: ${splitSummary}
 
 Directrices de conversación:
@@ -107,7 +144,7 @@ Directrices de conversación:
 3. Si pide motivación o expresa pereza: evita clichés vacíos; entrega psicología real, estoicismo (Marco Aurelio, Séneca, Epicteto) o frases épicas de disciplina (David Goggins, Demetrian Titus, Kratos, Mishima).
 
 PROTOCOLO DE ACCIONES AGÉNTICAS EN LA APP:
-SOLO cuando el usuario pida explícitamente que registres una comida/bebida, agregues vasos de agua, ajustes sus calorías diarias o cambies un ejercicio de su split activo, añade UNA SOLA línea al FINAL de tu respuesta con este formato JSON exacto:
+SOLO cuando el usuario pida explícitamente que registres una comida/bebida, agregues vasos de agua, ajustes sus calorías diarias, cambies un ejercicio de su split, blindes calorías para una cena/evento o registres sus pasos diarios, añade UNA SOLA línea al FINAL de tu respuesta con este formato JSON exacto:
 
 - Para registrar comida:
 <<<ACTION:{"type":"LOG_FOOD","payload":{"name":"Nombre corto","protein":25,"carbs":10,"fats":3,"calories":167}}>>>
@@ -117,6 +154,10 @@ SOLO cuando el usuario pida explícitamente que registres una comida/bebida, agr
 <<<ACTION:{"type":"ADJUST_CALORIES","payload":{"delta":-150,"reason":"Ajuste de déficit calórico"}}>>>
 - Para reemplazar un ejercicio en su split activo (dayIndex base 0):
 <<<ACTION:{"type":"SWAP_EXERCISE","payload":{"dayIndex":0,"targetName":"Press de Banca","newExercise":{"name":"Press Plano con Mancuernas","muscle":"Pecho","sets":"4","reps":"8-10 RIR 2","rest":"2 min","cue":"Controla la bajada 2 seg"}}}>>>
+- Para activar Escudo Social (reservar calorías para evento/cena):
+<<<ACTION:{"type":"ACTIVATE_SOCIAL_BANK","payload":{"reservedCalories":900,"eventName":"Cena Social"}}>>>
+- Para actualizar pasos diarios:
+<<<ACTION:{"type":"SET_STEPS","payload":{"steps":9500}}>>>
 
 No emitas <<<ACTION:...>>> si el usuario solo está preguntando información general.
 `;

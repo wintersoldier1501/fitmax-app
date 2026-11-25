@@ -11,7 +11,7 @@ import { PhysiqueVault } from "@/components/PhysiqueVault";
 import { TrophyVault } from "@/components/TrophyVault";
 import { NotificationSettingsCard } from "@/components/PwaInstallBanner";
 import Link from "next/link";
-import { Camera, Edit2, Settings, Lock, ChevronRight, User, BarChart2, Sliders, Trophy } from "lucide-react";
+import { Camera, Edit2, Settings, Lock, ChevronRight, User, BarChart2, Sliders, Trophy, Download, Upload, HardDrive } from "lucide-react";
 
 const THEMES = [
   { id: "light", label: "Obsidian Crimson", color: "#FF3366", reqXp: 0, rank: "Inicial" },
@@ -35,9 +35,12 @@ export default function Profile() {
     user,
     loginWithGoogle,
     logout,
+    exportBackupData,
+    importBackupData,
     showToast
   } = useFitmax();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const backupInputRef = useRef<HTMLInputElement>(null);
 
   const [tab, setTab] = useState<"analytics" | "physique" | "settings">("analytics");
   const [isEditingName, setIsEditingName] = useState(false);
@@ -368,6 +371,96 @@ export default function Profile() {
           </section>
 
           <NotificationSettingsCard />
+
+          <section>
+            <h3 style={{ fontSize: "1.1rem", color: "white", marginBottom: "0.75rem", display: "flex", alignItems: "center", gap: "0.45rem" }}>
+              <HardDrive size={18} color="var(--accent)" /> Modo Offline & Respaldo Portable
+            </h3>
+            <div className="glass-card" style={{ padding: "1.15rem", display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+              <span
+                style={{
+                  fontSize: "0.72rem",
+                  fontWeight: 700,
+                  color: "#10b981",
+                  background: "rgba(16, 185, 129, 0.12)",
+                  border: "1px solid rgba(16, 185, 129, 0.3)",
+                  padding: "0.28rem 0.6rem",
+                  borderRadius: "8px",
+                  alignSelf: "flex-start"
+                }}
+              >
+                ⚡ PWA Offline Activo (Funciona en gimnasios sin señal)
+              </span>
+              <p style={{ margin: 0, fontSize: "0.8rem", color: "var(--text-muted)", lineHeight: 1.45 }}>
+                Exporta todo tu historial, PRs, rutina y macros en un archivo <code>.json</code> para respaldar sin depender de conexión o migrar de dispositivo.
+              </p>
+              <input
+                ref={backupInputRef}
+                type="file"
+                accept=".json,application/json"
+                style={{ display: "none" }}
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  const reader = new FileReader();
+                  reader.onloadend = () => {
+                    if (typeof reader.result === "string") {
+                      importBackupData(reader.result);
+                    }
+                  };
+                  reader.readAsText(file);
+                  e.target.value = "";
+                }}
+              />
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.55rem" }}>
+                <button
+                  onClick={() => {
+                    const blob = new Blob([exportBackupData()], { type: "application/json" });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement("a");
+                    a.href = url;
+                    a.download = `fitmax-backup-${new Date().toISOString().slice(0, 10)}.json`;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                    showToast("📦 Respaldo .json descargado", "success");
+                  }}
+                  style={{
+                    padding: "0.75rem 0.6rem",
+                    borderRadius: "10px",
+                    background: "var(--accent-subtle)",
+                    border: "1px solid var(--accent-border)",
+                    color: "var(--accent)",
+                    fontWeight: 800,
+                    fontSize: "0.78rem",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "0.35rem"
+                  }}
+                >
+                  <Download size={14} /> Exportar .JSON
+                </button>
+                <button
+                  onClick={() => backupInputRef.current?.click()}
+                  style={{
+                    padding: "0.75rem 0.6rem",
+                    borderRadius: "10px",
+                    background: "rgba(255,255,255,0.06)",
+                    border: "1px solid var(--border)",
+                    color: "white",
+                    fontWeight: 800,
+                    fontSize: "0.78rem",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "0.35rem"
+                  }}
+                >
+                  <Upload size={14} /> Importar .JSON
+                </button>
+              </div>
+            </div>
+          </section>
 
           <section>
             <h3 style={{ fontSize: "1.1rem", color: "white", marginBottom: "0.75rem" }}>Sincronización en la Nube</h3>

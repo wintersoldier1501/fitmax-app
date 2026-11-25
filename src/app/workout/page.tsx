@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import styles from "./workout.module.css";
-import { useFitmax, SetRecord, ExerciseSessionRecord, RANKS } from "@/context/FitmaxContext";
+import { useFitmax, SetRecord, ExerciseSessionRecord, RANKS, getLocalISODate } from "@/context/FitmaxContext";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { DailyWisdom } from "@/components/DailyWisdom";
@@ -26,7 +26,11 @@ import {
   Dumbbell,
   Activity,
   Calculator,
-  Share2
+  Share2,
+  History,
+  Plus,
+  ChevronDown,
+  ChevronUp
 } from "lucide-react";
 
 const homeWorkouts = [
@@ -128,13 +132,15 @@ export default function Workout() {
     addXp,
     todayReadiness,
     exercisePRs,
+    workoutHistory,
+    dailyHistory,
     getLastExercisePerformance,
     logWorkoutSession,
     showToast
   } = useFitmax();
 
   // Page Tab
-  const [pageView, setPageView] = useState<"session" | "analytics">("session");
+  const [pageView, setPageView] = useState<"session" | "history" | "analytics">("session");
 
   // Modal State
   const [showSplitModal, setShowSplitModal] = useState(false);
@@ -173,6 +179,41 @@ export default function Workout() {
   const [tacticalTarget, setTacticalTarget] = useState<{ exIdx: number; exercise: any; workingWeight: number } | null>(null);
   const [showShareModal, setShowShareModal] = useState(false);
   const [swappedExercises, setSwappedExercises] = useState<Record<string, any>>({});
+  const [extraExercisesMap, setExtraExercisesMap] = useState<Record<string, any[]>>({});
+  const [deloadMode, setDeloadMode] = useState(false);
+  const [showAddExercise, setShowAddExercise] = useState(false);
+  const [extraName, setExtraName] = useState("");
+  const [extraMuscle, setExtraMuscle] = useState("Hombros");
+  const [extraSetsCount, setExtraSetsCount] = useState("3");
+  const [expandedHistoryId, setExpandedHistoryId] = useState<string | null>(null);
+  const draftLoadedRef = useRef(false);
+
+  // Restore active workout draft on mount
+  useEffect(() => {
+    if (typeof window === "undefined" || draftLoadedRef.current) return;
+    try {
+      const raw = localStorage.getItem("fitmax_workout_draft");
+      if (raw) {
+        const draft = JSON.parse(raw);
+        if (draft && draft.date === getLocalISODate()) {
+          if (typeof draft.activeDayTab === "number") setActiveDayTab(draft.activeDayTab);
+          if (typeof draft.viewStandardFallback === "boolean") setViewStandardFallback(draft.viewStandardFallback);
+          if (draft.fallbackLocation) setFallbackLocation(draft.fallbackLocation);
+          if (typeof draft.fallbackRoutineIdx === "number") setFallbackRoutineIdx(draft.fallbackRoutineIdx);
+          if (draft.exerciseSetsMap) setExerciseSetsMap(draft.exerciseSetsMap);
+          if (draft.swappedExercises) setSwappedExercises(draft.swappedExercises);
+          if (draft.extraExercisesMap) setExtraExercisesMap(draft.extraExercisesMap);
+          if (typeof draft.deloadMode === "boolean") setDeloadMode(draft.deloadMode);
+          if (typeof draft.startedAt === "number") sessionStartRef.current = draft.startedAt;
+        } else {
+          localStorage.removeItem("fitmax_workout_draft");
+        }
+      }
+    } catch {
+      // ignore corrupted draft
+    }
+    draftLoadedRef.current = true;
+  }, []);
 
   useEffect(() => {
     if (!isGenerating) return;
@@ -224,7 +265,51 @@ export default function Workout() {
   }
 
   const contextPrefix = isCustomMode ? `c_${activeDayTab}` : `s_${fallbackLocation}_${fallbackRoutineIdx}`;
-  currentExercises = currentExercises.map((ex, idx) => swappedExercises[`${contextPrefix}_${idx}`] || ex);
+  const baseExercises = currentExercises.map((ex, idx) => swappedExercises[`${contextPrefix}_${idx}`] || ex);
+  currentExercises = [...baseExercises, ...(extraExercisesMap[contextPrefix] || [])];
+
+  // Persist live workout draft whenever sets or extra exercises change
+  useEffect(() => {
+    if (!draftLoadedRef.current || typeof window === "undefined") return;
+    const completedCount = Object.values(exerciseSetsMap).reduce(
+      (acc, list) => acc + list.filter((s) => s.completed).length,
+      0
+    );
+    const hasExtras = Object.keys(extraExercisesMap).length > 0;
+    if (completedCount > 0 || hasExtras) {
+      try {
+        localStorage.setItem(
+          "fitmax_workout_draft",
+          JSON.stringify({
+            date: getLocalISODate(),
+            workoutTitle: currentWorkoutTitle,
+            activeDayTab,
+            viewStandardFallback,
+            fallbackLocation,
+            fallbackRoutineIdx,
+            exerciseSetsMap,
+            swappedExercises,
+            extraExercisesMap,
+            deloadMode,
+            startedAt: sessionStartRef.current,
+            completedCount
+          })
+        );
+      } catch {
+        // ignore storage quota
+      }
+    }
+  }, [
+    exerciseSetsMap,
+    swappedExercises,
+    extraExercisesMap,
+    activeDayTab,
+    viewStandardFallback,
+    fallbackLocation,
+    fallbackRoutineIdx,
+    deloadMode,
+    currentWorkoutTitle
+  ]);
 
   const rankName = RANKS[Math.min(Math.floor(xp / 200), RANKS.length - 1)];
 
@@ -250,15 +335,22 @@ export default function Workout() {
     if (exerciseSetsMap[key]) return exerciseSetsMap[key];
 
     const baseCount = Math.min(8, Math.max(1, parseInt(String(exercise.sets), 10) || 3));
-    const adjustedCount = autoRegulate && baseCount > 2 ? baseCount - 1 : baseCount;
+    let adjustedCount = autoRegulate && baseCount > 2 ? baseCount - 1 : baseCount;
+    if (deloadMode) {
+      adjustedCount = Math.max(2, Math.round(adjustedCount * 0.65));
+    }
     const prevSets = getLastExercisePerformance(exercise.name);
 
-    return Array.from({ length: adjustedCount }, (_, sIdx) => ({
-      weight: prevSets?.[sIdx]?.weight ?? prevSets?.[0]?.weight ?? 0,
-      reps: prevSets?.[sIdx]?.reps ?? 10,
-      completed: false,
-      isPR: false
-    }));
+    return Array.from({ length: adjustedCount }, (_, sIdx) => {
+      const refWeight = prevSets?.[sIdx]?.weight ?? prevSets?.[0]?.weight ?? 0;
+      const startWeight = deloadMode && refWeight > 0 ? Math.round(refWeight * 0.9 * 2) / 2 : refWeight;
+      return {
+        weight: startWeight,
+        reps: prevSets?.[sIdx]?.reps ?? 10,
+        completed: false,
+        isPR: false
+      };
+    });
   };
 
   const updateSetField = (exIdx: number, exercise: any, setIdx: number, field: "weight" | "reps", value: number) => {
@@ -360,6 +452,11 @@ export default function Workout() {
       exercises: exerciseRecords
     });
 
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("fitmax_workout_draft");
+    }
+    setExerciseSetsMap({});
+    setExtraExercisesMap({});
     setIsResting(false);
     setSessionSummary({
       workoutName: currentWorkoutTitle,
@@ -464,8 +561,8 @@ export default function Workout() {
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "1fr 1fr auto",
-          gap: "0.4rem",
+          gridTemplateColumns: "1fr 1fr 1fr auto",
+          gap: "0.35rem",
           background: "var(--bg-surface)",
           border: "1px solid var(--border)",
           borderRadius: "14px",
@@ -475,41 +572,58 @@ export default function Workout() {
         <button
           onClick={() => setPageView("session")}
           style={{
-            padding: "0.55rem 0.5rem",
+            padding: "0.55rem 0.35rem",
             borderRadius: "10px",
-            fontSize: "0.8rem",
+            fontSize: "0.75rem",
             fontWeight: pageView === "session" ? 800 : 600,
             background: pageView === "session" ? "var(--primary)" : "transparent",
             color: pageView === "session" ? "white" : "var(--text-muted)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            gap: "0.35rem"
+            gap: "0.3rem"
           }}
         >
-          <Dumbbell size={14} /> Sesión Activa
+          <Dumbbell size={13} /> Sesión
+        </button>
+        <button
+          onClick={() => setPageView("history")}
+          style={{
+            padding: "0.55rem 0.35rem",
+            borderRadius: "10px",
+            fontSize: "0.75rem",
+            fontWeight: pageView === "history" ? 800 : 600,
+            background: pageView === "history" ? "var(--primary)" : "transparent",
+            color: pageView === "history" ? "white" : "var(--text-muted)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: "0.3rem"
+          }}
+        >
+          <History size={13} /> Bitácora
         </button>
         <button
           onClick={() => setPageView("analytics")}
           style={{
-            padding: "0.55rem 0.5rem",
+            padding: "0.55rem 0.35rem",
             borderRadius: "10px",
-            fontSize: "0.8rem",
+            fontSize: "0.75rem",
             fontWeight: pageView === "analytics" ? 800 : 600,
             background: pageView === "analytics" ? "var(--primary)" : "transparent",
             color: pageView === "analytics" ? "white" : "var(--text-muted)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            gap: "0.35rem"
+            gap: "0.3rem"
           }}
         >
-          <Activity size={14} /> Mapa & PRs
+          <Activity size={13} /> Mapa
         </button>
         <Link
           href="/science"
           style={{
-            padding: "0.55rem 0.7rem",
+            padding: "0.55rem 0.65rem",
             borderRadius: "10px",
             fontSize: "0.78rem",
             fontWeight: 700,
@@ -526,61 +640,175 @@ export default function Workout() {
 
       {pageView === "analytics" ? (
         <MuscleMap />
+      ) : pageView === "history" ? (
+        <div style={{ display: "flex", flexDirection: "column", gap: "0.9rem" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "0.5rem" }}>
+            <div className="glass-card" style={{ padding: "0.8rem", textAlign: "center" }}>
+              <span style={{ fontSize: "0.66rem", color: "var(--text-muted)", textTransform: "uppercase", display: "block" }}>Sesiones</span>
+              <strong style={{ fontSize: "1.2rem", color: "white" }}>{workoutHistory.length}</strong>
+            </div>
+            <div className="glass-card" style={{ padding: "0.8rem", textAlign: "center" }}>
+              <span style={{ fontSize: "0.66rem", color: "var(--text-muted)", textTransform: "uppercase", display: "block" }}>Volumen Total</span>
+              <strong style={{ fontSize: "1.1rem", color: "var(--accent)" }}>
+                {(workoutHistory.reduce((acc, w) => acc + (w.totalVolumeKg || 0), 0) / 1000).toFixed(1)}t
+              </strong>
+            </div>
+            <div className="glass-card" style={{ padding: "0.8rem", textAlign: "center" }}>
+              <span style={{ fontSize: "0.66rem", color: "var(--text-muted)", textTransform: "uppercase", display: "block" }}>PRs Logrados</span>
+              <strong style={{ fontSize: "1.2rem", color: "#F59E0B" }}>
+                {workoutHistory.reduce((acc, w) => acc + (w.prsCount || 0), 0)}
+              </strong>
+            </div>
+          </div>
+
+          {workoutHistory.length === 0 ? (
+            <div className="glass-card" style={{ padding: "2rem 1.2rem", textAlign: "center" }}>
+              <Trophy size={40} color="var(--primary)" style={{ margin: "0 auto 0.7rem" }} />
+              <h3 style={{ margin: "0 0 0.4rem 0", color: "white" }}>Bitácora Vacía</h3>
+              <p style={{ margin: "0 0 1rem 0", color: "var(--text-muted)", fontSize: "0.84rem" }}>
+                Completa tu primera sesión en Iron Log Pro para ver tu historial de cargas y récords aquí.
+              </p>
+              <button
+                onClick={() => setPageView("session")}
+                className="glow-primary"
+                style={{ padding: "0.75rem 1.2rem", borderRadius: "10px", background: "var(--primary)", color: "white", fontWeight: 800 }}
+              >
+                Ir a Sesión Activa
+              </button>
+            </div>
+          ) : (
+            workoutHistory.map((sess) => {
+              const isExpanded = expandedHistoryId === sess.id;
+              return (
+                <div
+                  key={sess.id}
+                  onClick={() => setExpandedHistoryId(isExpanded ? null : sess.id)}
+                  className="glass-card"
+                  style={{ padding: "1rem", border: "1px solid var(--border)", cursor: "pointer" }}
+                >
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "0.5rem" }}>
+                    <div>
+                      <span style={{ fontSize: "0.7rem", color: "var(--accent)", fontWeight: 700 }}>{sess.date} • {sess.durationMinutes} min</span>
+                      <h4 style={{ margin: "0.15rem 0 0 0", color: "white", fontSize: "0.96rem" }}>{sess.workoutName}</h4>
+                    </div>
+                    <div style={{ textAlign: "right", display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                      <div>
+                        <strong style={{ color: "white", fontSize: "0.92rem", display: "block" }}>{sess.totalVolumeKg.toLocaleString()} kg</strong>
+                        {sess.prsCount > 0 && <span style={{ fontSize: "0.68rem", color: "#F59E0B", fontWeight: 800 }}>🏆 {sess.prsCount} PR</span>}
+                      </div>
+                      {isExpanded ? <ChevronUp size={16} color="var(--text-muted)" /> : <ChevronDown size={16} color="var(--text-muted)" />}
+                    </div>
+                  </div>
+
+                  {isExpanded && (
+                    <div style={{ marginTop: "0.75rem", paddingTop: "0.75rem", borderTop: "1px solid var(--border)", display: "flex", flexDirection: "column", gap: "0.45rem" }}>
+                      {sess.exercises.map((ex, eIdx) => {
+                        const done = ex.sets.filter((s) => s.completed);
+                        return (
+                          <div key={eIdx} style={{ fontSize: "0.76rem", color: "var(--text-muted)" }}>
+                            <strong style={{ color: "white" }}>{ex.name}:</strong>{" "}
+                            {done.map((s) => `${s.weight}kg×${s.reps}${s.isPR ? "🏆" : ""}`).join(" · ")}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })
+          )}
+        </div>
       ) : (
         <>
-          {/* Readiness Autoregulation Banner */}
-          {todayReadiness && (
-            <div
-              className="glass-card"
-              style={{
-                padding: "0.9rem 1rem",
-                borderRadius: "14px",
-                border:
-                  todayReadiness.score < 55
+          {/* Auto-Deload & Readiness Autoregulation Banner */}
+          {(() => {
+            const lowReadinessToday = Boolean(todayReadiness && todayReadiness.score < 55);
+            const recentLowDays = dailyHistory.slice(-5).filter((d) => typeof d.readinessScore === "number" && d.readinessScore < 58).length >= 2;
+            const highRecentVolume = workoutHistory.slice(0, 6).length >= 5;
+            const needsDeload = lowReadinessToday || recentLowDays || highRecentVolume;
+
+            return (
+              <div
+                className="glass-card"
+                style={{
+                  padding: "0.9rem 1rem",
+                  borderRadius: "14px",
+                  border: deloadMode || needsDeload
                     ? "1px solid rgba(245, 158, 11, 0.45)"
                     : "1px solid var(--accent-border)",
-                background:
-                  todayReadiness.score < 55
+                  background: deloadMode || needsDeload
                     ? "rgba(245, 158, 11, 0.08)"
                     : "var(--accent-subtle)",
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                gap: "0.75rem",
-                flexWrap: "wrap"
-              }}
-            >
-              <div style={{ display: "flex", alignItems: "center", gap: "0.55rem" }}>
-                <Brain size={18} color={todayReadiness.score < 55 ? "#F59E0B" : "var(--accent)"} />
-                <div>
-                  <span style={{ fontSize: "0.8rem", fontWeight: 800, color: "white", display: "block" }}>
-                    Readiness de Hoy: {todayReadiness.score}%
-                  </span>
-                  <span style={{ fontSize: "0.72rem", color: "var(--text-muted)" }}>
-                    {todayReadiness.score < 55
-                      ? "Fatiga elevada detectada. Se recomienda bajar 1 serie por ejercicio."
-                      : "Sistema nervioso listo para sobrecarga progresiva."}
-                  </span>
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  gap: "0.65rem",
+                  flexWrap: "wrap"
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: "0.55rem", flex: 1 }}>
+                  <Brain size={18} color={needsDeload || deloadMode ? "#F59E0B" : "var(--accent)"} />
+                  <div>
+                    <span style={{ fontSize: "0.8rem", fontWeight: 800, color: "white", display: "block" }}>
+                      {todayReadiness
+                        ? `Readiness Hoy: ${todayReadiness.score}%`
+                        : needsDeload
+                          ? "Alto Volumen Acumulado Detectado"
+                          : "SNC & Fatiga Listos"}
+                    </span>
+                    <span style={{ fontSize: "0.72rem", color: "var(--text-muted)" }}>
+                      {deloadMode
+                        ? "Modo Deload activo: -35% series y 90% carga para supercompensar."
+                        : needsDeload
+                          ? "Señales de fatiga/volumen alto: conviene activar Descarga Científica."
+                          : "Sistema nervioso preparado para sobrecarga progresiva."}
+                    </span>
+                  </div>
+                </div>
+                <div style={{ display: "flex", gap: "0.35rem", flexWrap: "wrap" }}>
+                  {lowReadinessToday && !deloadMode && (
+                    <button
+                      onClick={() => setAutoRegulate(!autoRegulate)}
+                      style={{
+                        padding: "0.38rem 0.65rem",
+                        borderRadius: "8px",
+                        fontSize: "0.72rem",
+                        fontWeight: 800,
+                        background: autoRegulate ? "#F59E0B" : "rgba(245, 158, 11, 0.16)",
+                        color: autoRegulate ? "#000" : "#F59E0B",
+                        border: "1px solid #F59E0B"
+                      }}
+                    >
+                      {autoRegulate ? "✓ -1 Serie" : "-1 Serie"}
+                    </button>
+                  )}
+                  <button
+                    onClick={() => {
+                      const next = !deloadMode;
+                      setDeloadMode(next);
+                      showToast(
+                        next
+                          ? "🛡️ Modo Deload activado (-35% volumen, RIR 3-4)"
+                          : "⚡ Modo Sobrecarga Progresiva restaurado",
+                        next ? "warning" : "success"
+                      );
+                    }}
+                    style={{
+                      padding: "0.38rem 0.7rem",
+                      borderRadius: "8px",
+                      fontSize: "0.72rem",
+                      fontWeight: 800,
+                      background: deloadMode ? "#F59E0B" : "rgba(255,255,255,0.06)",
+                      color: deloadMode ? "#000" : needsDeload ? "#FBBF24" : "var(--text-muted)",
+                      border: deloadMode || needsDeload ? "1px solid #F59E0B" : "1px solid var(--border)"
+                    }}
+                  >
+                    🛡️ {deloadMode ? "Deload ON" : "Modo Deload"}
+                  </button>
                 </div>
               </div>
-              {todayReadiness.score < 55 && (
-                <button
-                  onClick={() => setAutoRegulate(!autoRegulate)}
-                  style={{
-                    padding: "0.4rem 0.75rem",
-                    borderRadius: "8px",
-                    fontSize: "0.74rem",
-                    fontWeight: 800,
-                    background: autoRegulate ? "#F59E0B" : "rgba(245, 158, 11, 0.18)",
-                    color: autoRegulate ? "#000" : "#F59E0B",
-                    border: "1px solid #F59E0B"
-                  }}
-                >
-                  {autoRegulate ? "✓ Autorregulación Activa" : "Autorregular (-1 Serie)"}
-                </button>
-              )}
-            </div>
-          )}
+            );
+          })()}
 
           {/* Hero Banner: Custom Split Status or Call To Action */}
           {hasActivePlan && !viewStandardFallback ? (
@@ -833,7 +1061,10 @@ export default function Workout() {
                           {exercise.muscle && (
                             <span style={{ color: "var(--primary)", fontWeight: 700 }}>{exercise.muscle}</span>
                           )}
-                          <span style={{ color: "var(--text-muted)" }}>🎯 {exercise.reps}</span>
+                          <span style={{ color: "var(--text-muted)" }}>🎯 {deloadMode ? "RIR 3-4 (Descarga)" : exercise.reps}</span>
+                          {deloadMode && (
+                            <span style={{ color: "#FBBF24", fontWeight: 800 }}>🛡️ Deload</span>
+                          )}
                           {exercise.rest && <span style={{ color: "var(--text-muted)" }}>⏱️ {exercise.rest}</span>}
                         </div>
                       </div>
@@ -998,6 +1229,141 @@ export default function Workout() {
                   </div>
                 );
               })}
+            </div>
+
+            {/* Add Extra Exercise On-The-Fly */}
+            <div style={{ marginTop: "0.75rem" }}>
+              {!showAddExercise ? (
+                <button
+                  onClick={() => setShowAddExercise(true)}
+                  style={{
+                    width: "100%",
+                    padding: "0.68rem",
+                    borderRadius: "12px",
+                    background: "rgba(255,255,255,0.03)",
+                    border: "1px dashed var(--accent-border)",
+                    color: "var(--accent)",
+                    fontSize: "0.8rem",
+                    fontWeight: 700,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "0.35rem"
+                  }}
+                >
+                  <Plus size={15} /> Añadir Ejercicio Extra Hoy
+                </button>
+              ) : (
+                <div
+                  style={{
+                    padding: "0.85rem",
+                    borderRadius: "12px",
+                    background: "var(--bg-dark)",
+                    border: "1px solid var(--accent-border)",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "0.55rem"
+                  }}
+                >
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <span style={{ fontSize: "0.76rem", fontWeight: 800, color: "white" }}>Añadir Accesorio a Hoy</span>
+                    <button onClick={() => setShowAddExercise(false)} style={{ color: "var(--text-muted)" }}>
+                      <X size={15} />
+                    </button>
+                  </div>
+
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: "0.32rem" }}>
+                    {[
+                      { name: "Elevaciones Laterales", muscle: "Hombros" },
+                      { name: "Curl de Bíceps", muscle: "Bíceps" },
+                      { name: "Extensión Tríceps Polea", muscle: "Tríceps" },
+                      { name: "Face Pulls", muscle: "Espalda" },
+                      { name: "Crunch en Polea", muscle: "Core" }
+                    ].map((preset) => (
+                      <button
+                        key={preset.name}
+                        onClick={() => {
+                          setExtraName(preset.name);
+                          setExtraMuscle(preset.muscle);
+                        }}
+                        style={{
+                          padding: "0.28rem 0.5rem",
+                          borderRadius: "7px",
+                          fontSize: "0.68rem",
+                          background: extraName === preset.name ? "var(--primary)" : "rgba(255,255,255,0.05)",
+                          color: "white",
+                          border: "1px solid var(--border)"
+                        }}
+                      >
+                        + {preset.name}
+                      </button>
+                    ))}
+                  </div>
+
+                  <input
+                    type="text"
+                    placeholder="Nombre del ejercicio..."
+                    value={extraName}
+                    onChange={(e) => setExtraName(e.target.value)}
+                    style={{ width: "100%", padding: "0.55rem 0.7rem", fontSize: "0.84rem", borderRadius: "9px" }}
+                  />
+
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 78px", gap: "0.45rem" }}>
+                    <select
+                      value={extraMuscle}
+                      onChange={(e) => setExtraMuscle(e.target.value)}
+                      style={{ padding: "0.5rem", fontSize: "0.78rem", borderRadius: "9px" }}
+                    >
+                      {["Pecho", "Espalda", "Hombros", "Cuádriceps", "Isquiosurales", "Glúteos", "Bíceps", "Tríceps", "Core"].map((m) => (
+                        <option key={m} value={m}>{m}</option>
+                      ))}
+                    </select>
+                    <input
+                      type="number"
+                      min="1"
+                      max="6"
+                      value={extraSetsCount}
+                      onChange={(e) => setExtraSetsCount(e.target.value)}
+                      placeholder="Series"
+                      style={{ padding: "0.5rem", fontSize: "0.78rem", borderRadius: "9px", textAlign: "center" }}
+                    />
+                  </div>
+
+                  <button
+                    onClick={() => {
+                      if (!extraName.trim()) {
+                        showToast("Escribe el nombre del ejercicio", "warning");
+                        return;
+                      }
+                      const added = {
+                        name: extraName.trim(),
+                        muscle: extraMuscle,
+                        sets: extraSetsCount || "3",
+                        reps: "10-12 (RIR 1-2)",
+                        rest: "90 seg",
+                        cue: "Controla la excéntrica 2-3 segundos."
+                      };
+                      setExtraExercisesMap((prev) => ({
+                        ...prev,
+                        [contextPrefix]: [...(prev[contextPrefix] || []), added]
+                      }));
+                      setExtraName("");
+                      setShowAddExercise(false);
+                      showToast(`➕ ${added.name} agregado a la sesión`, "success");
+                    }}
+                    style={{
+                      padding: "0.62rem",
+                      borderRadius: "9px",
+                      background: "var(--accent)",
+                      color: "#000",
+                      fontWeight: 800,
+                      fontSize: "0.8rem"
+                    }}
+                  >
+                    Agregar a Esta Sesión
+                  </button>
+                </div>
+              )}
             </div>
 
             <button

@@ -8,7 +8,7 @@ import { useRouter } from "next/navigation";
 import { Trash2, Zap, Check, User } from "lucide-react";
 
 interface CoachAction {
-  type: "LOG_FOOD" | "ADD_WATER" | "ADJUST_CALORIES" | "SWAP_EXERCISE";
+  type: "LOG_FOOD" | "ADD_WATER" | "ADJUST_CALORIES" | "SWAP_EXERCISE" | "ACTIVATE_SOCIAL_BANK" | "SET_STEPS";
   payload: any;
 }
 
@@ -30,6 +30,7 @@ const DEFAULT_WELCOME: Message[] = [
 
 const QUICK_PROMPTS = [
   "📊 Evalúa mi día de hoy",
+  "🥂 Blindar 900 kcal para cena hoy",
   "⚡ Ajusta mi entreno según mi fatiga",
   "🥤 Regístrame 1 scoop de whey",
   "💀 Dame una reflexión estoica"
@@ -127,10 +128,18 @@ export default function Chat() {
     todayReadiness,
     customWorkoutPlan,
     streak,
+    biometrics,
+    dailySteps,
+    stepsGoal,
+    exercisePRs,
+    workoutHistory,
+    todaySocialBank,
     addFoodLog,
     addWater,
     adjustTargetCalories,
     saveWorkoutPlan,
+    activateSocialBank,
+    updateDailySteps,
     showToast,
     isLoaded
   } = useFitmax();
@@ -200,7 +209,13 @@ export default function Chat() {
           waterGlasses,
           todayReadiness,
           customWorkoutPlan,
-          streak
+          streak,
+          biometrics,
+          dailySteps,
+          stepsGoal,
+          exercisePRs,
+          recentWorkoutsCount: workoutHistory.slice(0, 7).length,
+          todaySocialBank
         }),
         signal: controller.signal
       });
@@ -272,6 +287,13 @@ export default function Chat() {
         saveWorkoutPlan(updatedPlan);
         showToast(`Rutina actualizada: ${newEx.name}`, "success");
       }
+    } else if (action.type === "ACTIVATE_SOCIAL_BANK") {
+      activateSocialBank(
+        Number(action.payload?.reservedCalories) || 900,
+        action.payload?.eventName || "Cena Social"
+      );
+    } else if (action.type === "SET_STEPS") {
+      updateDailySteps(Number(action.payload?.steps) || 8000);
     }
 
     setMessages((prev) => prev.map((m) => (m.id === msgId ? { ...m, actionApplied: true } : m)));
@@ -290,6 +312,12 @@ export default function Chat() {
     }
     if (action.type === "SWAP_EXERCISE") {
       return `Cambiar ejercicio a "${action.payload?.newExercise?.name || "Nuevo"}"`;
+    }
+    if (action.type === "ACTIVATE_SOCIAL_BANK") {
+      return `🛡️ Blindar ${action.payload?.reservedCalories || 900} kcal (${action.payload?.eventName || "Evento"})`;
+    }
+    if (action.type === "SET_STEPS") {
+      return `👟 Registrar ${(Number(action.payload?.steps) || 8000).toLocaleString()} pasos hoy`;
     }
     return "Aplicar acción";
   };
