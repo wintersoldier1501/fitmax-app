@@ -7,41 +7,85 @@ import { useFitmax } from "@/context/FitmaxContext";
 
 export default function Onboarding() {
   const router = useRouter();
-  const { setProfileAndCalculate } = useFitmax();
+  const { setProfileAndCalculate, showToast, profile } = useFitmax();
   const [step, setStep] = useState(1);
   const totalSteps = 5;
 
   const [formData, setFormData] = useState({
-    goal: "",
-    name: "",
-    sex: "",
-    age: "",
-    height: "",
-    weight: "",
-    targetWeight: "",
-    activityLevel: "",
-    budget: "",
+    goal: profile.goal || "",
+    name: profile.name || "",
+    sex: profile.sex || "",
+    age: profile.age ? String(profile.age) : "",
+    height: profile.height ? String(profile.height) : "",
+    weight: profile.weight ? String(profile.weight) : "",
+    targetWeight: profile.targetWeight ? String(profile.targetWeight) : "",
+    activityLevel: profile.activityLevel || "",
+    budget: profile.budget || ""
   });
 
   const updateForm = (key: string, value: string) => {
     setFormData((prev) => ({ ...prev, [key]: value }));
   };
 
+  const validateCurrentStep = (): boolean => {
+    if (step === 1 && !formData.goal) {
+      showToast("Selecciona tu objetivo principal para continuar", "warning");
+      return false;
+    }
+    if (step === 2) {
+      if (!formData.name.trim()) {
+        showToast("Ingresa tu nombre o apodo", "warning");
+        return false;
+      }
+      if (!formData.sex) {
+        showToast("Selecciona tu sexo biológico para calibrar la fórmula", "warning");
+        return false;
+      }
+      const ageNum = Number(formData.age);
+      if (!ageNum || ageNum < 12 || ageNum > 100) {
+        showToast("Ingresa una edad válida (12–100 años)", "warning");
+        return false;
+      }
+    }
+    if (step === 3) {
+      const h = Number(formData.height);
+      const w = Number(formData.weight);
+      if (!h || h < 100 || h > 240) {
+        showToast("Ingresa tu estatura en cm (ej. 175)", "warning");
+        return false;
+      }
+      if (!w || w < 30 || w > 280) {
+        showToast("Ingresa tu peso actual en kg (ej. 75)", "warning");
+        return false;
+      }
+    }
+    if (step === 4 && !formData.activityLevel) {
+      showToast("Selecciona tu nivel de actividad semanal", "warning");
+      return false;
+    }
+    return true;
+  };
+
   const handleNext = () => {
+    if (!validateCurrentStep()) return;
+
     if (step < totalSteps) {
       setStep(step + 1);
     } else {
-      // Finalize profile and calculate macros
+      const finalWeight = Number(formData.weight);
+      const finalTarget = Number(formData.targetWeight) || finalWeight;
       setProfileAndCalculate({
-        name: formData.name,
+        name: formData.name.trim(),
         sex: formData.sex,
         age: Number(formData.age),
         height: Number(formData.height),
-        weight: Number(formData.weight),
-        targetWeight: Number(formData.targetWeight),
+        weight: finalWeight,
+        targetWeight: finalTarget,
         goal: formData.goal as any,
         activityLevel: formData.activityLevel as any,
+        budget: (formData.budget || "Económico") as any
       });
+      showToast("¡Perfil calibrado con precisión científica!", "success");
       router.push("/dashboard");
     }
   };
@@ -60,11 +104,11 @@ export default function Onboarding() {
         return (
           <>
             <h1 className={styles.title}>¿Cuál es tu objetivo principal?</h1>
-            <p className={styles.subtitle}>Esto calibrará el algoritmo de la IA.</p>
+            <p className={styles.subtitle}>Esto calibrará el algoritmo calórico y de entrenamiento.</p>
             <div className={styles.optionsGrid}>
               {[
-                { title: "Perder Grasa", desc: "Déficit calórico para eliminar tejido adiposo." },
-                { title: "Recomposición Corporal", desc: "Bajar grasa y aumentar músculo simultáneamente." },
+                { title: "Perder Grasa", desc: "Déficit calórico inteligente para preservar músculo y eliminar grasa." },
+                { title: "Recomposición Corporal", desc: "Bajar grasa y aumentar músculo simultáneamente en mantenimiento." },
                 { title: "Subir de Peso Limpio", desc: "Superávit controlado para ganar masa muscular sin grasa extra." }
               ].map((opt) => (
                 <button
@@ -113,11 +157,11 @@ export default function Onboarding() {
             </div>
             <div className={styles.formGroup}>
               <label>Peso Actual (kg)</label>
-              <input type="number" placeholder="Ej. 80" value={formData.weight} onChange={(e) => updateForm("weight", e.target.value)} />
+              <input type="number" step="0.1" placeholder="Ej. 80" value={formData.weight} onChange={(e) => updateForm("weight", e.target.value)} />
             </div>
             <div className={styles.formGroup}>
               <label>Meta de Peso (kg)</label>
-              <input type="number" placeholder="Ej. 70" value={formData.targetWeight} onChange={(e) => updateForm("targetWeight", e.target.value)} />
+              <input type="number" step="0.1" placeholder="Ej. 74" value={formData.targetWeight} onChange={(e) => updateForm("targetWeight", e.target.value)} />
             </div>
           </>
         );
@@ -128,10 +172,10 @@ export default function Onboarding() {
             <p className={styles.subtitle}>¿Cuánto te mueves y cuánto te puedes comprometer?</p>
             <div className={styles.optionsGrid}>
               {[
-                { level: "Sedentario", desc: "Trabajo de oficina, poco movimiento" },
-                { level: "Ligero", desc: "1-3 días de ejercicio suave" },
-                { level: "Moderado", desc: "3-5 días de entrenamiento" },
-                { level: "Intenso", desc: "Atleta o 6-7 días pesados" }
+                { level: "Sedentario", desc: "Trabajo de oficina, poco movimiento diario" },
+                { level: "Ligero", desc: "1-3 días de ejercicio suave o caminata" },
+                { level: "Moderado", desc: "3-5 días de entrenamiento de fuerza" },
+                { level: "Intenso", desc: "Atleta o 6-7 días pesados a la semana" }
               ].map((opt) => (
                 <button
                   key={opt.level}
@@ -149,12 +193,12 @@ export default function Onboarding() {
         return (
           <>
             <h1 className={styles.title}>Macro-Economía</h1>
-            <p className={styles.subtitle}>La dieta debe ajustarse a tu bolsillo.</p>
+            <p className={styles.subtitle}>La dieta debe ajustarse a tu bolsillo y despensa.</p>
             <div className={styles.optionsGrid}>
               {[
-                { level: "Económico", desc: "Ingredientes accesibles y básicos (pollo, arroz, huevos)." },
-                { level: "Estándar", desc: "Equilibrio entre variedad y costo." },
-                { level: "Premium", desc: "Cortes finos, salmón, suplementos y variedad total." }
+                { level: "Económico", desc: "Ingredientes accesibles y básicos (pollo, arroz, huevos, atún)." },
+                { level: "Estándar", desc: "Equilibrio entre variedad cotidiana y costo." },
+                { level: "Premium", desc: "Cortes finos, salmón, whey protein y variedad gourmet." }
               ].map((opt) => (
                 <button
                   key={opt.level}
@@ -178,7 +222,7 @@ export default function Onboarding() {
       <div className={styles.progressContainer}>
         <div className={styles.progressBar} style={{ width: `${progressPercentage}%` }}></div>
       </div>
-      
+
       <div className={styles.content}>
         {renderStep()}
       </div>

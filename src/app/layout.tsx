@@ -3,6 +3,7 @@ import { Inter, Outfit, Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 import { FitmaxProvider } from "@/context/FitmaxContext";
 import { BottomNav } from "@/components/BottomNav";
+import { ToastOverlay } from "@/components/ToastOverlay";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 const outfit = Outfit({ subsets: ["latin"], variable: "--font-outfit" });
@@ -15,7 +16,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport = {
-  themeColor: "#09090b",
+  themeColor: "#050507",
 };
 
 export default function RootLayout({
@@ -27,7 +28,10 @@ export default function RootLayout({
     <html lang="es">
       <body className={`${inter.variable} ${outfit.variable} ${jakarta.variable} font-sans`}>
         <FitmaxProvider>
-          {children}
+          <ToastOverlay />
+          <div className="app-shell">
+            {children}
+          </div>
           <BottomNav />
         </FitmaxProvider>
       </body>

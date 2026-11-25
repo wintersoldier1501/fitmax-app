@@ -69,10 +69,12 @@ const mealStages = ["Desayuno", "Almuerzo", "Cena"];
 
 export default function DietBuilder() {
   const router = useRouter();
-  const { isLoaded, targetMacros, saveDiet } = useFitmax();
-  
-  const [step, setStep] = useState(0); // 0: Budget, 1: Desayuno, 2: Almuerzo, 3: Cena
-  const [budget, setBudget] = useState<"economico" | "premium">("economico");
+  const { isLoaded, profile, targetMacros, saveDiet, showToast } = useFitmax();
+
+  const [step, setStep] = useState(0); // 0: Budget, 1: Preferences
+  const [budget, setBudget] = useState<"economico" | "premium">(
+    profile.budget === "Premium" ? "premium" : "economico"
+  );
   
   const [selections, setSelections] = useState<any>({
     protein: [], carbs: [], fats: []
@@ -114,34 +116,47 @@ export default function DietBuilder() {
     setShowScanner(true);
   };
 
-  const handleCustomAnalyze = () => {
-    if (!customInput) return;
+  const handleCustomAnalyze = async () => {
+    if (!customInput.trim()) return;
     setIsAnalyzing(true);
-    
-    setTimeout(() => {
+
+    try {
+      const res = await fetch("/api/food/parse", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: `100g de ${customInput}` })
+      });
+      const data = await res.json();
+      const macros = data?.totalMacros || { protein: 20, carbs: 25, fats: 8, calories: 252 };
+
       const inputLower = customInput.toLowerCase();
-      const isPiece = inputLower.includes("hotcake") || 
-                      inputLower.includes("taco") || 
-                      inputLower.includes("dog") || 
-                      inputLower.includes("hamburguesa") ||
-                      inputLower.includes("pizza") ||
-                      inputLower.includes("pan") ||
-                      inputLower.includes("galleta");
-                      
+      const isPiece =
+        inputLower.includes("hotcake") ||
+        inputLower.includes("taco") ||
+        inputLower.includes("dog") ||
+        inputLower.includes("hamburguesa") ||
+        inputLower.includes("pizza") ||
+        inputLower.includes("pan") ||
+        inputLower.includes("galleta");
+
       const unit = isPiece ? "pz" : "g";
-      
       let ratio = 0.2;
       let icon = "✨";
-      if (modalCategory === "protein") { 
-        ratio = isPiece ? (inputLower.includes("dog") ? 10 : 15) : 0.25; 
-        icon = inputLower.includes("dog") ? "🌭" : "🥩"; 
+
+      if (modalCategory === "protein") {
+        ratio = isPiece ? Math.max(8, macros.protein || 14) : Math.max(0.1, Math.min(0.8, (macros.protein || 22) / 100));
+        icon = "🥩";
+      } else if (modalCategory === "carbs") {
+        ratio = isPiece ? Math.max(10, macros.carbs || 22) : Math.max(0.1, Math.min(0.85, (macros.carbs || 45) / 100));
+        icon = "🌾";
+      } else {
+        ratio = isPiece ? Math.max(5, macros.fats || 10) : Math.max(0.08, Math.min(0.9, (macros.fats || 25) / 100));
+        icon = "🥑";
       }
-      if (modalCategory === "carbs") { ratio = isPiece ? 20 : 0.60; icon = "🌾"; }
-      if (modalCategory === "fats") { ratio = isPiece ? 10 : 0.40; icon = "🥑"; }
 
       const newFood = {
         id: `custom_${Date.now()}`,
-        name: customInput.substring(0, 25) + (customInput.length > 25 ? "..." : ""),
+        name: customInput.trim().substring(0, 28),
         icon,
         unit,
         ratio
@@ -152,12 +167,15 @@ export default function DietBuilder() {
         [modalCategory]: [...customFoods[modalCategory], newFood]
       });
 
-      setIsAnalyzing(false);
+      handleSelect(modalCategory, newFood.id);
+      showToast(`"${newFood.name}" calibrado con IA`, "success");
       setShowModal(false);
       setCustomInput("");
-      
-      handleSelect(modalCategory, newFood.id);
-    }, 2000);
+    } catch {
+      showToast("No se pudo analizar el antojo", "error");
+    } finally {
+      setIsAnalyzing(false);
+    }
   };
 
   const handleScan = () => {

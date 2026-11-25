@@ -6,14 +6,42 @@ import styles from "./dashboard.module.css";
 import { RankCard } from "@/components/RankCard";
 import { MacroRing } from "@/components/MacroRing";
 import { DailyWisdom } from "@/components/DailyWisdom";
-import { useFitmax } from "@/context/FitmaxContext";
+import { useFitmax, RANKS } from "@/context/FitmaxContext";
 import Link from "next/link";
-import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { Dumbbell, ChevronRight, Camera, User, Droplets, Plus, Minus, X, Check, Scale, Sparkles } from "lucide-react";
+import {
+  Dumbbell,
+  ChevronRight,
+  User,
+  Droplets,
+  Plus,
+  Minus,
+  X,
+  Scale,
+  Sparkles,
+  Brain,
+  TrendingUp
+} from "lucide-react";
 
 export default function Dashboard() {
-  const { isLoaded, profile, targetMacros, currentMacros, xp, streak, waterGlasses, addWater, removeWater, setProfileAndCalculate, addXp, customWorkoutPlan } = useFitmax();
+  const {
+    isLoaded,
+    profile,
+    targetMacros,
+    currentMacros,
+    xp,
+    streak,
+    streakShields,
+    waterGlasses,
+    addWater,
+    removeWater,
+    setProfileAndCalculate,
+    adjustTargetCalories,
+    addXp,
+    customWorkoutPlan,
+    todayReadiness,
+    showToast
+  } = useFitmax();
   const router = useRouter();
 
   // Check-in modal state
@@ -23,41 +51,59 @@ export default function Dashboard() {
     diff: number;
     advice: string;
     suggestAdjustment: boolean;
+    recommendedDelta: number;
   } | null>(null);
-  
-  if (!isLoaded) return null; // Avoid hydration mismatch and flash of empty data
+
+  if (!isLoaded) return null;
 
   const userName = profile.name || "Guerrero";
   const date = new Date().toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "short" });
-  
-  // Rank logic
-  const ranks = ["Hierro I", "Hierro II", "Hierro III", "Bronce I", "Plata", "Oro", "Titán", "Leyenda Fitmax"];
-  const rankIndex = Math.min(Math.floor(xp / 200), ranks.length - 1);
-  const rankName = ranks[rankIndex];
-  const maxXP = (rankIndex + 1) * 200;
+
+  // Exact Tier XP Logic
+  const rankIndex = Math.min(Math.floor(xp / 200), RANKS.length - 1);
+  const rankName = RANKS[rankIndex];
+  const isMaxRank = rankIndex === RANKS.length - 1;
+  const xpInRank = isMaxRank ? 200 : xp % 200;
+  const maxTierXP = 200;
 
   const macros = {
-    protein: { current: currentMacros.protein, target: targetMacros.protein || 1, color: "var(--primary)" }, 
-    carbs: { current: currentMacros.carbs, target: targetMacros.carbs || 1, color: "#FFA500" }, 
-    fats: { current: currentMacros.fats, target: targetMacros.fats || 1, color: "#A9A9A9" }, 
+    protein: { current: currentMacros.protein, target: targetMacros.protein || 1, color: "var(--primary)" },
+    carbs: { current: currentMacros.carbs, target: targetMacros.carbs || 1, color: "var(--accent)" },
+    fats: { current: currentMacros.fats, target: targetMacros.fats || 1, color: "#F59E0B" }
   };
+
+  const targetCalBudget =
+    targetMacros.calories ||
+    Math.round(macros.protein.target * 4 + macros.carbs.target * 4 + macros.fats.target * 9);
+  const consumedCal = currentMacros.calories || 0;
+  const remainingCal = Math.max(0, targetCalBudget - consumedCal);
+  const calPercent = Math.min(100, Math.round((consumedCal / Math.max(1, targetCalBudget)) * 100));
 
   return (
     <main className={styles.main}>
-      
       {/* Header Section */}
-      <motion.header 
+      <motion.header
         className={styles.header}
-        initial={{ opacity: 0, y: -20 }}
+        initial={{ opacity: 0, y: -16 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.1 }}
+        transition={{ duration: 0.45 }}
       >
         <div>
           <p className={styles.date}>{date}</p>
           <h1 className={styles.greeting}>Hola, {userName}</h1>
         </div>
         <Link href="/profile" style={{ textDecoration: "none" }}>
-          <div className={styles.profilePic} style={{ overflow: "hidden", position: "relative", backgroundColor: "var(--bg-surface-solid)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div
+            className={styles.profilePic}
+            style={{
+              overflow: "hidden",
+              position: "relative",
+              backgroundColor: "var(--bg-surface-solid)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center"
+            }}
+          >
             {profile.avatar ? (
               <img src={profile.avatar} alt="Profile" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
             ) : (
@@ -69,11 +115,13 @@ export default function Dashboard() {
 
       {/* Gamification Rank Card */}
       <section>
-        <RankCard 
-          rankName={rankName} 
-          currentXP={xp} 
-          maxXP={maxXP} 
-          streak={streak} 
+        <RankCard
+          rankName={rankName}
+          currentXP={xp}
+          maxXP={maxTierXP}
+          xpInRank={xpInRank}
+          streak={streak}
+          streakShields={streakShields}
         />
       </section>
 
@@ -81,89 +129,144 @@ export default function Dashboard() {
       <motion.section
         initial={{ opacity: 0, y: 15 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.25 }}
-        style={{ marginTop: "1.2rem" }}
+        transition={{ duration: 0.45, delay: 0.15 }}
       >
         <DailyWisdom />
       </motion.section>
 
-      {/* Daily Macros Rings */}
+      {/* Daily Macros Rings + Master Calorie Bar */}
       <motion.section
-        initial={{ opacity: 0, scale: 0.95 }}
+        initial={{ opacity: 0, scale: 0.96 }}
         animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.5, delay: 0.3 }}
+        transition={{ duration: 0.45, delay: 0.2 }}
       >
-        <h2 className={styles.sectionTitle}>Tus Macros de Hoy</h2>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.9rem" }}>
+          <h2 className={styles.sectionTitle} style={{ margin: 0 }}>Tus Macros de Hoy</h2>
+          <Link href="/log" style={{ fontSize: "0.78rem", color: "var(--accent)", fontWeight: 700 }}>
+            + Registrar Comida
+          </Link>
+        </div>
+
         <div className={styles.macrosContainer}>
-          <MacroRing 
-            label="Proteína" 
-            current={macros.protein.current} 
-            total={macros.protein.target} 
-            color={macros.protein.color} 
-            size={90}
-            strokeWidth={8}
-          />
-          <MacroRing 
-            label="Carbos" 
-            current={macros.carbs.current} 
-            total={macros.carbs.target} 
-            color={macros.carbs.color} 
-            size={90}
-            strokeWidth={8}
-          />
-          <MacroRing 
-            label="Grasas" 
-            current={macros.fats.current} 
-            total={macros.fats.target} 
-            color={macros.fats.color} 
-            size={90}
-            strokeWidth={8}
-          />
+          <MacroRing label="Proteína" current={macros.protein.current} total={macros.protein.target} color={macros.protein.color} size={88} strokeWidth={8} />
+          <MacroRing label="Carbos" current={macros.carbs.current} total={macros.carbs.target} color={macros.carbs.color} size={88} strokeWidth={8} />
+          <MacroRing label="Grasas" current={macros.fats.current} total={macros.fats.target} color={macros.fats.color} size={88} strokeWidth={8} />
         </div>
-        <div className="glass-card" style={{ marginTop: "1rem", padding: "1rem", textAlign: "center", display: "flex", justifyContent: "space-between", alignItems: "center", border: "1px solid rgba(255, 255, 255, 0.05)" }}>
-          <span style={{ color: "var(--text-muted)", fontSize: "0.85rem", textTransform: "uppercase", letterSpacing: "1px" }}>Presupuesto Diario</span>
-          <span style={{ color: "white", fontSize: "1.2rem", fontWeight: "bold", fontFamily: "var(--font-display)" }}>
-            {Math.round((macros.protein.target * 4) + (macros.carbs.target * 4) + (macros.fats.target * 9))} <span style={{ color: "var(--primary)", fontSize: "0.9rem" }}>kcal</span>
+
+        {/* Master Caloric Progress Card */}
+        <div
+          className="glass-card"
+          style={{
+            marginTop: "0.85rem",
+            padding: "1rem 1.15rem",
+            border: "1px solid var(--border)",
+            display: "flex",
+            flexDirection: "column",
+            gap: "0.55rem"
+          }}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div>
+              <span style={{ color: "var(--text-muted)", fontSize: "0.75rem", textTransform: "uppercase", letterSpacing: "0.8px", display: "block" }}>
+                Presupuesto Calórico
+              </span>
+              <span style={{ color: "white", fontSize: "1.15rem", fontWeight: 800, fontFamily: "var(--font-display)" }}>
+                {consumedCal} <span style={{ fontSize: "0.82rem", color: "var(--text-muted)", fontWeight: 500 }}>/ {targetCalBudget} kcal</span>
+              </span>
+            </div>
+            <div style={{ textAlign: "right" }}>
+              <span style={{ fontSize: "0.72rem", color: "var(--text-muted)", display: "block" }}>Restantes</span>
+              <span style={{ fontSize: "1.05rem", fontWeight: 800, color: "var(--accent)" }}>{remainingCal} kcal</span>
+            </div>
+          </div>
+
+          <div style={{ width: "100%", height: "7px", background: "var(--bg-dark)", borderRadius: "4px", overflow: "hidden" }}>
+            <div
+              style={{
+                width: `${calPercent}%`,
+                height: "100%",
+                background: consumedCal > targetCalBudget ? "#EF4444" : "linear-gradient(90deg, var(--primary), var(--accent))",
+                transition: "width 0.4s ease"
+              }}
+            />
+          </div>
+        </div>
+      </motion.section>
+
+      {/* Quick Readiness & Analytics Strip */}
+      <motion.section
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.45, delay: 0.25 }}
+        style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}
+      >
+        <Link
+          href="/log"
+          className="glass-card"
+          style={{ padding: "1rem", border: "1px solid var(--border)", display: "flex", flexDirection: "column", gap: "0.35rem" }}
+        >
+          <span style={{ fontSize: "0.72rem", color: "var(--accent)", fontWeight: 800, display: "flex", alignItems: "center", gap: "0.3rem" }}>
+            <Brain size={14} /> READINESS HOY
           </span>
-        </div>
+          <span style={{ fontSize: "1.2rem", fontWeight: 800, color: "white" }}>
+            {todayReadiness ? `${todayReadiness.score}%` : "Evaluar"}
+          </span>
+          <span style={{ fontSize: "0.72rem", color: "var(--text-muted)" }}>
+            {todayReadiness ? `Sueño: ${todayReadiness.sleepHours}h` : "Registra sueño y fatiga"}
+          </span>
+        </Link>
+
+        <Link
+          href="/profile"
+          className="glass-card"
+          style={{ padding: "1rem", border: "1px solid var(--border)", display: "flex", flexDirection: "column", gap: "0.35rem" }}
+        >
+          <span style={{ fontSize: "0.72rem", color: "var(--primary)", fontWeight: 800, display: "flex", alignItems: "center", gap: "0.3rem" }}>
+            <TrendingUp size={14} /> EVOLUCIÓN
+          </span>
+          <span style={{ fontSize: "1.2rem", fontWeight: 800, color: "white" }}>
+            {profile.weight ? `${profile.weight} kg` : "Ver Gráficas"}
+          </span>
+          <span style={{ fontSize: "0.72rem", color: "var(--text-muted)" }}>
+            Mapa muscular y tendencias
+          </span>
+        </Link>
       </motion.section>
 
       {/* Water Hydration Tracker */}
       <motion.section
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.35 }}
-        style={{ marginTop: "1.5rem" }}
+        transition={{ duration: 0.45, delay: 0.3 }}
       >
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.8rem" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.75rem" }}>
           <h2 className={styles.sectionTitle} style={{ margin: 0, display: "flex", alignItems: "center", gap: "0.5rem" }}>
-            <Droplets size={20} color="#00E5FF" /> Hidratación
+            <Droplets size={19} color="var(--accent)" /> Hidratación
           </h2>
-          <span style={{ color: "#00E5FF", fontSize: "0.85rem", fontWeight: "bold" }}>
+          <span style={{ color: "var(--accent)", fontSize: "0.84rem", fontWeight: "bold" }}>
             {waterGlasses * 250} ml / 2500 ml
           </span>
         </div>
 
-        <div className="glass-card" style={{ padding: "1.2rem", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "1rem", border: "1px solid rgba(0, 229, 255, 0.15)" }}>
+        <div className="glass-card" style={{ padding: "1.1rem", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.9rem", border: "1px solid var(--accent-border)" }}>
           <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", flex: 1 }}>
             {[...Array(8)].map((_, i) => (
               <div
                 key={i}
                 style={{
-                  width: "28px",
-                  height: "36px",
+                  width: "26px",
+                  height: "34px",
                   borderRadius: "6px",
-                  background: i < waterGlasses 
-                    ? "linear-gradient(180deg, #00E5FF 0%, #0088FF 100%)" 
+                  background: i < waterGlasses
+                    ? "linear-gradient(180deg, var(--accent) 0%, #0077FF 100%)"
                     : "rgba(255, 255, 255, 0.05)",
-                  border: i < waterGlasses ? "1px solid #00E5FF" : "1px solid rgba(255, 255, 255, 0.1)",
+                  border: i < waterGlasses ? "1px solid var(--accent)" : "1px solid rgba(255, 255, 255, 0.1)",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  fontSize: "0.7rem",
+                  fontSize: "0.68rem",
                   color: "white",
-                  fontWeight: "bold",
-                  boxShadow: i < waterGlasses ? "0 0 10px rgba(0, 229, 255, 0.4)" : "none",
+                  boxShadow: i < waterGlasses ? "0 0 10px var(--accent-subtle)" : "none",
                   transition: "all 0.3s ease"
                 }}
               >
@@ -172,13 +275,13 @@ export default function Dashboard() {
             ))}
           </div>
 
-          <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+          <div style={{ display: "flex", gap: "0.45rem", alignItems: "center" }}>
             <button
               onClick={removeWater}
               disabled={waterGlasses <= 0}
               style={{
-                width: "36px",
-                height: "36px",
+                width: "34px",
+                height: "34px",
                 borderRadius: "50%",
                 background: "rgba(255, 255, 255, 0.08)",
                 border: "1px solid rgba(255, 255, 255, 0.15)",
@@ -191,27 +294,25 @@ export default function Dashboard() {
               }}
               title="Quitar vaso"
             >
-              <Minus size={16} />
+              <Minus size={15} />
             </button>
             <button
               onClick={addWater}
               style={{
-                width: "36px",
-                height: "36px",
+                width: "34px",
+                height: "34px",
                 borderRadius: "50%",
-                background: "#00E5FF",
-                border: "none",
+                background: "var(--accent)",
                 color: "#000",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                cursor: "pointer",
                 fontWeight: "bold",
-                boxShadow: "0 0 12px rgba(0, 229, 255, 0.5)"
+                boxShadow: "0 0 12px var(--accent-subtle)"
               }}
               title="Añadir vaso (250ml)"
             >
-              <Plus size={18} />
+              <Plus size={17} />
             </button>
           </div>
         </div>
@@ -221,54 +322,58 @@ export default function Dashboard() {
       <motion.section
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.4 }}
-        style={{ marginTop: "2rem" }}
+        transition={{ duration: 0.45, delay: 0.35 }}
       >
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.8rem" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.75rem" }}>
           <h2 className={styles.sectionTitle} style={{ margin: 0 }}>Tu Entrenamiento</h2>
           {customWorkoutPlan ? (
-            <span style={{ fontSize: "0.75rem", color: "#00E5FF", fontWeight: "bold", background: "rgba(0, 229, 255, 0.12)", padding: "0.2rem 0.6rem", borderRadius: "10px", border: "1px solid rgba(0, 229, 255, 0.3)" }}>
+            <span style={{ fontSize: "0.74rem", color: "var(--accent)", fontWeight: "bold", background: "var(--accent-subtle)", padding: "0.2rem 0.6rem", borderRadius: "10px", border: "1px solid var(--accent-border)" }}>
               ⚡ Split Activo ({customWorkoutPlan.daysPerWeek}D)
             </span>
           ) : (
-            <span style={{ fontSize: "0.75rem", color: "var(--primary)", fontWeight: "bold", background: "rgba(255, 51, 102, 0.12)", padding: "0.2rem 0.6rem", borderRadius: "10px", border: "1px solid rgba(255, 51, 102, 0.3)" }}>
+            <span style={{ fontSize: "0.74rem", color: "var(--primary)", fontWeight: "bold", background: "var(--primary-subtle)", padding: "0.2rem 0.6rem", borderRadius: "10px", border: "1px solid var(--primary-border)" }}>
               ✨ Generador IA
             </span>
           )}
         </div>
-        <div 
+        <div
           onClick={() => router.push("/workout")}
           className="glass-card"
-          style={{ 
-            padding: "1.3rem 1.5rem",
+          style={{
+            padding: "1.25rem 1.4rem",
             cursor: "pointer",
             position: "relative",
             overflow: "hidden",
-            border: customWorkoutPlan ? "1px solid rgba(0, 229, 255, 0.3)" : undefined
+            border: customWorkoutPlan ? "1px solid var(--accent-border)" : undefined
           }}
         >
           <div style={{ position: "absolute", top: "-20px", right: "-10px", opacity: 0.05, zIndex: 0, color: "var(--text-main)" }}>
-            <Dumbbell size={150} />
+            <Dumbbell size={140} />
           </div>
           <div style={{ position: "relative", zIndex: 1, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <div>
-              <h3 style={{ margin: "0 0 0.3rem 0", color: "var(--text-main)", fontSize: "1.15rem", fontWeight: 800 }}>
-                {customWorkoutPlan ? customWorkoutPlan.splitTitle : "RUTINA DEL DÍA"}
+              <h3 style={{ margin: "0 0 0.25rem 0", color: "var(--text-main)", fontSize: "1.12rem", fontWeight: 800 }}>
+                {customWorkoutPlan ? customWorkoutPlan.splitTitle : "IRON LOG PRO"}
               </h3>
-              <p style={{ margin: 0, color: "var(--text-muted)", fontSize: "0.85rem" }}>
-                {customWorkoutPlan 
+              <p style={{ margin: 0, color: "var(--text-muted)", fontSize: "0.84rem" }}>
+                {customWorkoutPlan
                   ? `${customWorkoutPlan.days?.[0]?.dayName || "Sesión de Hipertrofia"} • ${customWorkoutPlan.equipment}`
-                  : "Genera tu split semanal 100% personalizado por IA"}
+                  : "Registra pesos, timer de descanso y genera tu split IA"}
               </p>
             </div>
-            <div className="glow-primary" style={{ 
-              width: "40px", height: "40px", 
-              backgroundColor: customWorkoutPlan ? "#00E5FF" : "var(--primary)", 
-              borderRadius: "50%", 
-              display: "flex", alignItems: "center", justifyContent: "center",
-              boxShadow: customWorkoutPlan ? "0 0 15px rgba(0, 229, 255, 0.4)" : undefined
-            }}>
-              <ChevronRight color={customWorkoutPlan ? "black" : "white"} size={24} />
+            <div
+              className="glow-primary"
+              style={{
+                width: "38px",
+                height: "38px",
+                backgroundColor: customWorkoutPlan ? "var(--accent)" : "var(--primary)",
+                borderRadius: "50%",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center"
+              }}
+            >
+              <ChevronRight color={customWorkoutPlan ? "black" : "white"} size={22} />
             </div>
           </div>
         </div>
@@ -278,72 +383,70 @@ export default function Dashboard() {
       <motion.section
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.5 }}
-        style={{ marginTop: "2rem", paddingBottom: "4rem" }}
+        transition={{ duration: 0.45, delay: 0.4 }}
+        style={{ paddingBottom: "2rem" }}
       >
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.85rem" }}>
           <h2 className={styles.sectionTitle} style={{ margin: 0 }}>Check-in Semanal</h2>
-          <span style={{ fontSize: "0.8rem", color: "var(--primary)", fontWeight: "bold", background: "rgba(255, 51, 102, 0.15)", padding: "0.3rem 0.8rem", borderRadius: "12px", border: "1px solid rgba(255,51,102,0.3)" }}>Disponible Hoy</span>
+          <span style={{ fontSize: "0.75rem", color: "var(--primary)", fontWeight: "bold", background: "var(--primary-subtle)", padding: "0.25rem 0.7rem", borderRadius: "12px", border: "1px solid var(--primary-border)" }}>
+            Disponible Hoy
+          </span>
         </div>
-        
-        <div 
+
+        <div
           className="glass-card"
-          style={{ 
+          style={{
             border: "1px dashed var(--primary)",
-            padding: "1.5rem",
+            padding: "1.35rem",
             position: "relative",
             overflow: "hidden"
           }}
         >
-          <div style={{ position: "relative", zIndex: 1 }}>
-            <h3 style={{ margin: "0 0 0.5rem 0", color: "white", fontSize: "1.1rem" }}>Evaluación de Estancamiento</h3>
-            <p style={{ margin: "0 0 1.5rem 0", color: "var(--text-muted)", fontSize: "0.9rem", lineHeight: 1.5 }}>
-              Sube tus fotos y peso de la semana. La IA analizará si has llegado a un <i>Plateau</i> (estancamiento) y ajustará tus macros automáticamente si es necesario.
-            </p>
-            <button 
-              onClick={() => {
-                setNewWeight(profile.weight ? profile.weight.toString() : "");
-                setCheckInResult(null);
-                setShowCheckIn(true);
-              }}
-              style={{
-                width: "100%",
-                padding: "1rem",
-                background: "rgba(255, 51, 102, 0.15)",
-                color: "var(--primary)",
-                border: "1px solid var(--primary)",
-                borderRadius: "12px",
-                fontWeight: "700",
-                cursor: "pointer",
-                display: "flex",
-                justifyContent: "center",
-                alignItems: "center",
-                gap: "0.5rem",
-                transition: "all 0.2s"
-              }}
-              onMouseEnter={(e) => e.currentTarget.style.background = "rgba(255,51,102,0.25)"}
-              onMouseLeave={(e) => e.currentTarget.style.background = "rgba(255, 51, 102, 0.15)"}
-            >
-              <Scale size={20} /> Iniciar Evaluación Semanal
-            </button>
-          </div>
+          <h3 style={{ margin: "0 0 0.45rem 0", color: "white", fontSize: "1.05rem" }}>Evaluación de Estancamiento</h3>
+          <p style={{ margin: "0 0 1.2rem 0", color: "var(--text-muted)", fontSize: "0.86rem", lineHeight: 1.5 }}>
+            Actualiza tu peso semanal en ayunas. Fitmax detectará si estás en un <i>Plateau</i> y recalibrará tus calorías automáticamente.
+          </p>
+          <button
+            onClick={() => {
+              setNewWeight(profile.weight ? profile.weight.toString() : "");
+              setCheckInResult(null);
+              setShowCheckIn(true);
+            }}
+            style={{
+              width: "100%",
+              padding: "0.95rem",
+              background: "var(--primary-subtle)",
+              color: "var(--primary)",
+              border: "1px solid var(--primary)",
+              borderRadius: "12px",
+              fontWeight: "700",
+              display: "flex",
+              justifyContent: "center",
+              alignItems: "center",
+              gap: "0.5rem"
+            }}
+          >
+            <Scale size={19} /> Iniciar Evaluación Semanal
+          </button>
         </div>
       </motion.section>
 
       {/* Weekly Check-in Modal */}
       <AnimatePresence>
         {showCheckIn && (
-          <div style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(0,0,0,0.85)",
-            backdropFilter: "blur(8px)",
-            zIndex: 200,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: "1rem"
-          }}>
+          <div
+            style={{
+              position: "fixed",
+              inset: 0,
+              background: "rgba(0,0,0,0.85)",
+              backdropFilter: "blur(8px)",
+              zIndex: 200,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: "1rem"
+            }}
+          >
             <motion.div
               initial={{ scale: 0.9, opacity: 0, y: 20 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
@@ -351,34 +454,31 @@ export default function Dashboard() {
               className="glass-card"
               style={{
                 width: "100%",
-                maxWidth: "420px",
-                padding: "2rem",
-                background: "var(--bg-surface)",
+                maxWidth: "410px",
+                padding: "1.8rem",
+                background: "var(--bg-surface-solid)",
                 border: "1px solid var(--border)",
                 borderRadius: "20px"
               }}
             >
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.3rem" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                  <Scale size={22} color="var(--primary)" />
-                  <h3 style={{ margin: 0, color: "white", fontSize: "1.2rem" }}>Check-in Semanal</h3>
+                  <Scale size={21} color="var(--primary)" />
+                  <h3 style={{ margin: 0, color: "white", fontSize: "1.15rem" }}>Check-in Semanal</h3>
                 </div>
-                <button
-                  onClick={() => setShowCheckIn(false)}
-                  style={{ background: "transparent", border: "none", color: "var(--text-muted)", cursor: "pointer" }}
-                >
+                <button onClick={() => setShowCheckIn(false)} style={{ color: "var(--text-muted)" }}>
                   <X size={20} />
                 </button>
               </div>
 
               {!checkInResult ? (
                 <div>
-                  <p style={{ color: "var(--text-muted)", fontSize: "0.9rem", lineHeight: 1.5, marginBottom: "1.5rem" }}>
+                  <p style={{ color: "var(--text-muted)", fontSize: "0.88rem", lineHeight: 1.5, marginBottom: "1.2rem" }}>
                     Tu peso registrado anterior era <strong style={{ color: "white" }}>{profile.weight || 70} kg</strong>. Ingresa tu peso actual en ayunas:
                   </p>
 
-                  <div style={{ marginBottom: "1.5rem" }}>
-                    <label style={{ display: "block", color: "var(--text-muted)", fontSize: "0.85rem", marginBottom: "0.5rem" }}>
+                  <div style={{ marginBottom: "1.3rem" }}>
+                    <label style={{ display: "block", color: "var(--text-muted)", fontSize: "0.82rem", marginBottom: "0.45rem" }}>
                       Peso actual (kg):
                     </label>
                     <input
@@ -389,12 +489,11 @@ export default function Dashboard() {
                       onChange={(e) => setNewWeight(e.target.value)}
                       style={{
                         width: "100%",
-                        padding: "1rem",
+                        padding: "0.95rem",
                         background: "var(--bg-dark)",
-                        border: "1px solid var(--border)",
                         borderRadius: "12px",
                         color: "white",
-                        fontSize: "1.1rem",
+                        fontSize: "1.05rem",
                         fontWeight: "bold"
                       }}
                     />
@@ -405,50 +504,52 @@ export default function Dashboard() {
                       const currentW = profile.weight || 70;
                       const enteredW = parseFloat(newWeight);
                       if (!enteredW || enteredW < 30 || enteredW > 300) {
-                        alert("Por favor ingresa un peso válido.");
+                        showToast("Por favor ingresa un peso válido (30–300 kg)", "warning");
                         return;
                       }
 
                       const diff = Math.round((enteredW - currentW) * 10) / 10;
                       let advice = "";
                       let suggest = false;
+                      let delta = 0;
 
                       if (profile.goal === "Perder Grasa") {
                         if (diff <= -0.3) {
-                          advice = `¡Gran trabajo! Has bajado ${Math.abs(diff)} kg. Tu ritmo es perfecto y seguro. No necesitas cambiar tus macros.`;
+                          advice = `¡Gran trabajo! Has bajado ${Math.abs(diff)} kg. Tu ritmo de déficit es óptimo y seguro.`;
                         } else if (diff >= 0.3) {
-                          advice = `Aumentaste ${diff} kg. Puede ser retención de líquidos o necesitas un ajuste calórico de -150 kcal.`;
+                          advice = `Subiste ${diff} kg. Puede ser retención hídrica o conviene un ajuste de -150 kcal.`;
                           suggest = true;
+                          delta = -150;
                         } else {
-                          advice = `Tu peso se mantuvo igual (${diff} kg). Si llevas 2 semanas así, podemos ajustar -150 kcal para reactivar el déficit.`;
+                          advice = `Peso estable (${diff} kg). Si llevas 2 semanas así, ajustamos -150 kcal para reactivar la pérdida de grasa.`;
                           suggest = true;
+                          delta = -150;
                         }
                       } else if (profile.goal === "Subir de Peso Limpio") {
                         if (diff >= 0.2 && diff <= 0.6) {
-                          advice = `¡Excelente hipertrofia! Subiste ${diff} kg. Estás en el rango óptimo de ganancia muscular sin acumular grasa excesiva.`;
+                          advice = `¡Excelente superávit limpio! Subiste ${diff} kg sin grasa excesiva.`;
                         } else if (diff < 0.1) {
-                          advice = `Tu peso no subió (${diff} kg). Te recomendamos sumar +200 kcal diarias de carbohidratos complejos.`;
+                          advice = `Tu peso no subió (${diff} kg). Te conviene sumar +200 kcal de carbohidratos complejos.`;
                           suggest = true;
+                          delta = 200;
                         } else {
-                          advice = `Subiste ${diff} kg en una semana. Es un ritmo un poco rápido, vigila no acumular grasa innecesaria.`;
+                          advice = `Subiste ${diff} kg en una semana. Ritmo rápido: vigila el porcentaje graso.`;
                         }
                       } else {
-                        advice = `Diferencia de ${diff} kg. En recomposición corporal busca mantener tu fuerza en el gym mientras el peso se estabiliza.`;
+                        advice = `Variación de ${diff} kg. En recomposición busca subir marcas en el gym mientras el peso oscila poco.`;
                       }
 
-                      setCheckInResult({ diff, advice, suggestAdjustment: suggest });
+                      setCheckInResult({ diff, advice, suggestAdjustment: suggest, recommendedDelta: delta });
                     }}
                     className="glow-primary"
                     style={{
                       width: "100%",
-                      padding: "1rem",
+                      padding: "0.95rem",
                       background: "var(--primary)",
-                      border: "none",
                       color: "white",
                       borderRadius: "12px",
                       fontWeight: "bold",
-                      fontSize: "1rem",
-                      cursor: "pointer"
+                      fontSize: "0.98rem"
                     }}
                   >
                     Evaluar Progreso
@@ -456,23 +557,25 @@ export default function Dashboard() {
                 </div>
               ) : (
                 <div>
-                  <div style={{
-                    padding: "1.2rem",
-                    background: "rgba(0, 229, 255, 0.08)",
-                    border: "1px solid rgba(0, 229, 255, 0.2)",
-                    borderRadius: "12px",
-                    marginBottom: "1.5rem"
-                  }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.5rem" }}>
-                      <Sparkles size={18} color="#00E5FF" />
-                      <strong style={{ color: "#00E5FF" }}>Diagnóstico del Coach IA</strong>
+                  <div
+                    style={{
+                      padding: "1.1rem",
+                      background: "var(--accent-subtle)",
+                      border: "1px solid var(--accent-border)",
+                      borderRadius: "12px",
+                      marginBottom: "1.2rem"
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.45rem", marginBottom: "0.45rem" }}>
+                      <Sparkles size={17} color="var(--accent)" />
+                      <strong style={{ color: "var(--accent)" }}>Diagnóstico del Coach IA</strong>
                     </div>
-                    <p style={{ margin: 0, color: "var(--text-main)", fontSize: "0.95rem", lineHeight: 1.5 }}>
+                    <p style={{ margin: 0, color: "var(--text-main)", fontSize: "0.9rem", lineHeight: 1.5 }}>
                       {checkInResult.advice}
                     </p>
                   </div>
 
-                  <div style={{ display: "flex", gap: "0.8rem", flexDirection: "column" }}>
+                  <div style={{ display: "flex", gap: "0.7rem", flexDirection: "column" }}>
                     <button
                       onClick={() => {
                         const enteredW = parseFloat(newWeight);
@@ -480,31 +583,33 @@ export default function Dashboard() {
                           ...profile,
                           weight: enteredW
                         });
-                        addXp(100);
+                        if (checkInResult.suggestAdjustment && checkInResult.recommendedDelta !== 0) {
+                          adjustTargetCalories(checkInResult.recommendedDelta, `Peso y calorías recalibrados (${enteredW} kg)`);
+                        }
+                        addXp(100, "Check-in semanal");
                         setShowCheckIn(false);
-                        alert("¡Check-in completado! +100 XP ganados.");
                       }}
+                      className="glow-primary"
                       style={{
-                        padding: "1rem",
+                        padding: "0.95rem",
                         background: "var(--primary)",
-                        border: "none",
                         color: "white",
                         borderRadius: "12px",
-                        fontWeight: "bold",
-                        cursor: "pointer"
+                        fontWeight: "bold"
                       }}
                     >
-                      Guardar Nuevo Peso ({newWeight} kg)
+                      {checkInResult.suggestAdjustment
+                        ? `Guardar Peso (${newWeight} kg) y Ajustar ${checkInResult.recommendedDelta > 0 ? "+" : ""}${checkInResult.recommendedDelta} kcal`
+                        : `Guardar Nuevo Peso (${newWeight} kg)`}
                     </button>
                     <button
                       onClick={() => setShowCheckIn(false)}
                       style={{
-                        padding: "0.8rem",
+                        padding: "0.75rem",
                         background: "transparent",
                         border: "1px solid var(--border)",
                         color: "var(--text-muted)",
-                        borderRadius: "12px",
-                        cursor: "pointer"
+                        borderRadius: "12px"
                       }}
                     >
                       Cerrar
@@ -516,7 +621,6 @@ export default function Dashboard() {
           </div>
         )}
       </AnimatePresence>
-
     </main>
   );
 }

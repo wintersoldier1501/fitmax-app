@@ -5,33 +5,57 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
 
 export async function POST(req: Request) {
   try {
-    const { image } = await req.json();
+    const { image, mode = "meal" } = await req.json();
 
     if (!process.env.GEMINI_API_KEY) {
-      return NextResponse.json({ 
-        error: "Falta GEMINI_API_KEY en Vercel." 
-      }, { status: 400 });
+      return NextResponse.json(
+        { error: "Falta GEMINI_API_KEY en Vercel para analizar imágenes." },
+        { status: 400 }
+      );
     }
 
     if (!image) {
       return NextResponse.json({ error: "No image provided" }, { status: 400 });
     }
 
-    // Extract base64 data (remove "data:image/jpeg;base64,")
     const base64Data = image.split(",")[1] || image;
     const mimeType = image.split(";")[0].split(":")[1] || "image/jpeg";
 
-    const prompt = `
-Eres un nutricionista experto. Analiza la comida en esta imagen y estima sus macronutrientes.
-Responde ÚNICAMENTE con un objeto JSON válido, sin formato Markdown, con esta estructura exacta:
+    const prompt =
+      mode === "label"
+        ? `
+Eres un lector OCR de tablas nutrimentales experto. Analiza la etiqueta nutricional en esta fotografía y extrae los valores por porción declarada (o por 100g si no hay porción clara).
+Responde ÚNICAMENTE con un objeto JSON válido, sin formato Markdown:
+{
+  "name": "Nombre del producto + tamaño de porción (ej. Proteína Isolate - 1 scoop 30g)",
+  "servingSize": "ej. 30g",
+  "protein": <entero gramos>,
+  "carbs": <entero gramos>,
+  "fats": <entero gramos>,
+  "calories": <entero kcal>
+}
+`
+        : `
+Eres un nutricionista experto en visión por computadora. Analiza la comida en esta imagen, desglosa los ingredientes visibles y calcula sus macronutrientes totales.
+Responde ÚNICAMENTE con un objeto JSON válido, sin formato Markdown:
 {
   "name": "Nombre descriptivo del platillo",
-  "protein": <numero entero de gramos>,
-  "carbs": <numero entero de gramos>,
-  "fats": <numero entero de gramos>,
-  "calories": <numero entero total de calorias>
+  "items": [
+    {
+      "name": "Ingrediente visible",
+      "portion": "Porción estimada",
+      "protein": <entero g>,
+      "carbs": <entero g>,
+      "fats": <entero g>,
+      "calories": <entero kcal>
+    }
+  ],
+  "protein": <suma total entero gramos>,
+  "carbs": <suma total entero gramos>,
+  "fats": <suma total entero gramos>,
+  "calories": <suma total entero kcal>
 }
-Si la imagen no parece comida, intenta adivinar o devuelve valores en 0, pero siempre devuelve el JSON.
+Si la imagen no parece comida, devuelve valores en 0 pero siempre en formato JSON válido.
 `;
 
     const imageParts = [
@@ -43,15 +67,17 @@ Si la imagen no parece comida, intenta adivinar o devuelve valores en 0, pero si
       }
     ];
 
-    // Attempt with current official models verified in AI Studio
-    const modelsToTry = ["gemini-flash-latest", "gemini-3.7-flash", "gemini-3.5-flash", "gemini-3.8-flash"];
+    const modelsToTry = ["gemini-flash-latest", "gemini-flash-lite-latest"];
     let text = "";
     let lastError: any = null;
 
     for (const modelName of modelsToTry) {
       try {
         const model = genAI.getGenerativeModel({ model: modelName });
-        const result = await model.generateContent([prompt, ...imageParts]);
+        const result: any = await Promise.race([
+          model.generateContent([prompt, ...imageParts]),
+          new Promise<never>((_, reject) => setTimeout(() => reject(new Error("VisionTimeout")), 4500))
+        ]);
         const response = await result.response;
         text = response.text().trim();
         if (text) break;
@@ -64,17 +90,18 @@ Si la imagen no parece comida, intenta adivinar o devuelve valores en 0, pero si
     if (!text) {
       throw lastError || new Error("No se pudo procesar la imagen con los modelos disponibles.");
     }
-    
-    // Clean up markdown if the AI includes it despite instructions
-    if (text.startsWith("\`\`\`json")) text = text.replace("\`\`\`json", "");
-    if (text.startsWith("\`\`\`")) text = text.replace("\`\`\`", "");
-    if (text.endsWith("\`\`\`")) text = text.replace(/\`\`\`$/, "");
-    
-    const parsedData = JSON.parse(text.trim());
 
+    if (text.startsWith("```json")) text = text.replace(/^```json/, "");
+    if (text.startsWith("```")) text = text.replace(/^```/, "");
+    if (text.endsWith("```")) text = text.replace(/```$/, "");
+
+    const parsedData = JSON.parse(text.trim());
     return NextResponse.json(parsedData);
   } catch (error: any) {
     console.error("Vision API Error:", error);
-    return NextResponse.json({ error: error.message || "Failed to process image" }, { status: 500 });
+    return NextResponse.json(
+      { error: error.message || "Error al procesar la imagen" },
+      { status: 500 }
+    );
   }
 }

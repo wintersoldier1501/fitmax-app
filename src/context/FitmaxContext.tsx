@@ -1,14 +1,15 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, ReactNode, useRef } from "react";
+import React, { createContext, useContext, useState, useEffect, ReactNode, useRef, useCallback } from "react";
 import { auth, db, googleProvider } from "@/lib/firebase";
-import { onAuthStateChanged, signInWithRedirect, signOut, User } from "firebase/auth";
+import { onAuthStateChanged, signInWithPopup, signInWithRedirect, signOut, User } from "firebase/auth";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 
-type Goal = "Perder Grasa" | "Recomposición Corporal" | "Subir de Peso Limpio";
-type Activity = "Sedentario" | "Ligero" | "Moderado" | "Intenso";
+export type Goal = "Perder Grasa" | "Recomposición Corporal" | "Subir de Peso Limpio";
+export type Activity = "Sedentario" | "Ligero" | "Moderado" | "Intenso";
+export type Budget = "Económico" | "Estándar" | "Premium";
 
-interface UserProfile {
+export interface UserProfile {
   name: string;
   sex: string; // "H" | "M"
   age: number;
@@ -20,10 +21,11 @@ interface UserProfile {
   targetWeight: number;
   goal: Goal | "";
   activityLevel: Activity | "";
-  avatar?: string; // Base64 image
+  budget?: Budget;
+  avatar?: string;
 }
 
-interface Macros {
+export interface Macros {
   protein: number;
   carbs: number;
   fats: number;
@@ -38,9 +40,82 @@ export interface FoodLog {
   image?: string;
 }
 
-interface Biometrics {
+export interface Biometrics {
   bodyFatPercentage: number | null;
   leanMass: number | null;
+}
+
+export interface DailyHistoryEntry {
+  date: string; // YYYY-MM-DD
+  calories: number;
+  targetCalories: number;
+  protein: number;
+  carbs: number;
+  fats: number;
+  waterGlasses: number;
+  weight?: number;
+  workoutsCompleted: number;
+  totalVolumeKg: number;
+  readinessScore?: number;
+}
+
+export interface WeightEntry {
+  date: string; // YYYY-MM-DD
+  weight: number;
+  bodyFat?: number;
+}
+
+export interface ReadinessLog {
+  date: string; // YYYY-MM-DD
+  sleepHours: number;
+  sleepQuality: number; // 1-10
+  fatigue: number; // 1-10
+  soreness: number; // 1-10
+  score: number; // 0-100
+  note: string;
+}
+
+export interface SetRecord {
+  weight: number;
+  reps: number;
+  completed: boolean;
+  isPR?: boolean;
+}
+
+export interface ExerciseSessionRecord {
+  name: string;
+  muscle: string;
+  sets: SetRecord[];
+  best1RM: number;
+}
+
+export interface WorkoutSessionLog {
+  id: string;
+  date: string; // YYYY-MM-DD
+  workoutName: string;
+  durationMinutes: number;
+  totalVolumeKg: number;
+  prsCount: number;
+  musclesWorked: string[];
+  exercises: ExerciseSessionRecord[];
+}
+
+export interface ExercisePR {
+  weight: number;
+  reps: number;
+  best1RM: number;
+  date: string;
+}
+
+export interface ToastItem {
+  id: string;
+  message: string;
+  type: "success" | "xp" | "warning" | "error";
+}
+
+export interface LevelUpInfo {
+  rankName: string;
+  xp: number;
 }
 
 interface FitmaxState {
@@ -53,7 +128,20 @@ interface FitmaxState {
   activeTheme: string;
   xp: number;
   streak: number;
+  streakShields: number;
+  lastActiveDate: string;
+  dailyHistory: DailyHistoryEntry[];
+  weightHistory: WeightEntry[];
+  workoutHistory: WorkoutSessionLog[];
+  exercisePRs: Record<string, ExercisePR>;
+  todayReadiness: ReadinessLog | null;
+  toasts: ToastItem[];
+  levelUpInfo: LevelUpInfo | null;
+  showToast: (message: string, type?: ToastItem["type"]) => void;
+  dismissToast: (id: string) => void;
+  closeLevelUp: () => void;
   setProfileAndCalculate: (profileData: UserProfile) => void;
+  adjustTargetCalories: (delta: number, reason?: string) => void;
   updateAvatar: (base64String: string) => void;
   updateName: (newName: string) => void;
   addFoodLog: (food: FoodLog) => void;
@@ -61,25 +149,108 @@ interface FitmaxState {
   waterGlasses: number;
   addWater: () => void;
   removeWater: () => void;
-  addXp: (amount: number) => void;
+  addXp: (amount: number, label?: string) => void;
   saveTheme: (theme: string) => void;
   customDiet: any;
   saveDiet: (diet: any) => void;
   customWorkoutPlan: any;
   saveWorkoutPlan: (plan: any) => void;
-  resetProgress: () => void; // For testing or new day
+  logWorkoutSession: (session: Omit<WorkoutSessionLog, "id" | "date">) => void;
+  getLastExercisePerformance: (exerciseName: string) => SetRecord[] | null;
+  saveReadinessLog: (data: Omit<ReadinessLog, "date" | "score">) => void;
+  resetProgress: () => void;
   user: User | null;
   loginWithGoogle: () => Promise<void>;
   logout: () => Promise<void>;
   lastResetDate: string;
 }
 
+export const RANKS = [
+  "Hierro I",
+  "Hierro II",
+  "Hierro III",
+  "Bronce I",
+  "Plata",
+  "Oro",
+  "Titán",
+  "Leyenda Fitmax"
+];
+
 const defaultProfile: UserProfile = {
-  name: "", sex: "", age: 0, height: 0, weight: 0, targetWeight: 0, goal: "", activityLevel: ""
+  name: "",
+  sex: "",
+  age: 0,
+  height: 0,
+  weight: 0,
+  targetWeight: 0,
+  goal: "",
+  activityLevel: "",
+  budget: "Económico"
 };
+
 const defaultMacros: Macros = { protein: 0, carbs: 0, fats: 0, calories: 0 };
 
 const FitmaxContext = createContext<FitmaxState | undefined>(undefined);
+
+function safeParse<T>(raw: string | null, fallback: T): T {
+  if (!raw) return fallback;
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    return fallback;
+  }
+}
+
+export function getLocalISODate(d: Date = new Date()): string {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function diffDaysISO(fromISO: string, toISO: string): number {
+  if (!fromISO || !toISO) return 999;
+  const from = new Date(`${fromISO}T00:00:00`);
+  const to = new Date(`${toISO}T00:00:00`);
+  return Math.round((to.getTime() - from.getTime()) / (1000 * 60 * 60 * 24));
+}
+
+export function compressThumbnail(dataUrl: string, maxDim = 180, quality = 0.55): Promise<string> {
+  return new Promise((resolve) => {
+    if (typeof window === "undefined" || !dataUrl.startsWith("data:image")) {
+      resolve(dataUrl);
+      return;
+    }
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      let { width, height } = img;
+      if (width > height && width > maxDim) {
+        height = Math.round((height * maxDim) / width);
+        width = maxDim;
+      } else if (height >= width && height > maxDim) {
+        width = Math.round((width * maxDim) / height);
+        height = maxDim;
+      }
+      canvas.width = Math.max(1, width);
+      canvas.height = Math.max(1, height);
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        resolve(dataUrl);
+        return;
+      }
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      const webp = canvas.toDataURL("image/webp", quality);
+      if (webp.startsWith("data:image/webp")) {
+        resolve(webp);
+      } else {
+        resolve(canvas.toDataURL("image/jpeg", quality));
+      }
+    };
+    img.onerror = () => resolve(dataUrl);
+    img.src = dataUrl;
+  });
+}
 
 export const FitmaxProvider = ({ children }: { children: ReactNode }) => {
   const [isLoaded, setIsLoaded] = useState(false);
@@ -89,61 +260,130 @@ export const FitmaxProvider = ({ children }: { children: ReactNode }) => {
   const [loggedFoods, setLoggedFoods] = useState<FoodLog[]>([]);
   const [customDiet, setCustomDiet] = useState<any>(null);
   const [customWorkoutPlan, setCustomWorkoutPlan] = useState<any>(null);
-  const [xp, setXp] = useState(0); 
+  const [xp, setXp] = useState(0);
   const [streak, setStreak] = useState(0);
-  const [bodyFat, setBodyFat] = useState<number | null>(null);
+  const [streakShields, setStreakShields] = useState(1);
+  const [lastActiveDate, setLastActiveDate] = useState("");
   const [biometrics, setBiometrics] = useState<Biometrics>({ bodyFatPercentage: null, leanMass: null });
   const [activeTheme, setActiveTheme] = useState("light");
   const [user, setUser] = useState<User | null>(null);
   const [lastResetDate, setLastResetDate] = useState(new Date().toDateString());
   const [waterGlasses, setWaterGlasses] = useState(0);
+
+  const [dailyHistory, setDailyHistory] = useState<DailyHistoryEntry[]>([]);
+  const [weightHistory, setWeightHistory] = useState<WeightEntry[]>([]);
+  const [workoutHistory, setWorkoutHistory] = useState<WorkoutSessionLog[]>([]);
+  const [exercisePRs, setExercisePRs] = useState<Record<string, ExercisePR>>({});
+  const [todayReadiness, setTodayReadiness] = useState<ReadinessLog | null>(null);
+
+  const [toasts, setToasts] = useState<ToastItem[]>([]);
+  const [levelUpInfo, setLevelUpInfo] = useState<LevelUpInfo | null>(null);
+
   const isCloudLoaded = useRef(false);
 
-  // Load from localStorage on mount
+  const dismissToast = useCallback((id: string) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  }, []);
+
+  const showToast = useCallback((message: string, type: ToastItem["type"] = "success") => {
+    const id = `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    setToasts((prev) => [...prev.slice(-3), { id, message, type }]);
+    setTimeout(() => {
+      setToasts((prev) => prev.filter((t) => t.id !== id));
+    }, 3400);
+  }, []);
+
+  const closeLevelUp = useCallback(() => {
+    setLevelUpInfo(null);
+  }, []);
+
+  // Load from localStorage on mount & perform midnight history archiving
   useEffect(() => {
-    const savedProfile = localStorage.getItem("fitmax_profile");
-    const savedTarget = localStorage.getItem("fitmax_targetMacros");
-    const savedCurrent = localStorage.getItem("fitmax_currentMacros");
-    const savedLogs = localStorage.getItem("fitmax_loggedFoods");
-    const savedDiet = localStorage.getItem("fitmax_customDiet");
-    const savedWorkoutPlan = localStorage.getItem("fitmax_customWorkoutPlan");
-    const savedXp = localStorage.getItem("fitmax_xp");
-    const savedStreak = localStorage.getItem("fitmax_streak");
-    const savedBiometrics = localStorage.getItem("fitmax_biometrics");
-    const savedTheme = localStorage.getItem("fitmax_theme");
+    const savedProfile = safeParse<UserProfile>(localStorage.getItem("fitmax_profile"), defaultProfile);
+    const savedTarget = safeParse<Macros>(localStorage.getItem("fitmax_targetMacros"), defaultMacros);
+    const savedCurrent = safeParse<Macros>(localStorage.getItem("fitmax_currentMacros"), defaultMacros);
+    const savedLogs = safeParse<FoodLog[]>(localStorage.getItem("fitmax_loggedFoods"), []);
+    const savedDiet = safeParse<any>(localStorage.getItem("fitmax_customDiet"), null);
+    const savedWorkoutPlan = safeParse<any>(localStorage.getItem("fitmax_customWorkoutPlan"), null);
+    const savedXp = Number(localStorage.getItem("fitmax_xp") || 0);
+    const savedStreak = Number(localStorage.getItem("fitmax_streak") || 0);
+    const savedShieldsRaw = localStorage.getItem("fitmax_streakShields");
+    const savedShields = savedShieldsRaw !== null ? Number(savedShieldsRaw) : 1;
+    const savedLastActive = localStorage.getItem("fitmax_lastActiveDate") || "";
+    const savedBiometrics = safeParse<Biometrics>(localStorage.getItem("fitmax_biometrics"), { bodyFatPercentage: null, leanMass: null });
+    const savedTheme = localStorage.getItem("fitmax_theme") || "light";
     const savedResetDate = localStorage.getItem("fitmax_lastResetDate");
-    const savedWater = localStorage.getItem("fitmax_water");
+    const savedWater = Number(localStorage.getItem("fitmax_water") || 0);
 
-    const today = new Date().toDateString();
+    let savedDailyHistory = safeParse<DailyHistoryEntry[]>(localStorage.getItem("fitmax_dailyHistory"), []);
+    const savedWeightHistory = safeParse<WeightEntry[]>(localStorage.getItem("fitmax_weightHistory"), []);
+    const savedWorkoutHistory = safeParse<WorkoutSessionLog[]>(localStorage.getItem("fitmax_workoutHistory"), []);
+    const savedExercisePRs = safeParse<Record<string, ExercisePR>>(localStorage.getItem("fitmax_exercisePRs"), {});
+    const savedReadiness = safeParse<ReadinessLog | null>(localStorage.getItem("fitmax_todayReadiness"), null);
 
-    if (savedProfile) setProfile(JSON.parse(savedProfile));
-    if (savedTarget) setTargetMacros(JSON.parse(savedTarget));
-    if (savedDiet) setCustomDiet(JSON.parse(savedDiet));
-    if (savedWorkoutPlan) setCustomWorkoutPlan(JSON.parse(savedWorkoutPlan));
-    if (savedXp) setXp(Number(savedXp));
-    if (savedStreak) setStreak(Number(savedStreak));
-    if (savedBiometrics) setBiometrics(JSON.parse(savedBiometrics));
-    if (savedTheme) {
-      setActiveTheme(savedTheme);
-      document.documentElement.setAttribute('data-theme', savedTheme);
-    }
-    
-    // Check if a new day has started
-    if (savedResetDate && savedResetDate !== today) {
-      // It's a new day! Reset macros and logs.
+    const todayStr = new Date().toDateString();
+    const todayISO = getLocalISODate();
+
+    setProfile(savedProfile);
+    setTargetMacros(savedTarget);
+    setCustomDiet(savedDiet);
+    setCustomWorkoutPlan(savedWorkoutPlan);
+    setXp(isNaN(savedXp) ? 0 : savedXp);
+    setStreak(isNaN(savedStreak) ? 0 : savedStreak);
+    setStreakShields(isNaN(savedShields) ? 1 : savedShields);
+    setLastActiveDate(savedLastActive);
+    setBiometrics(savedBiometrics);
+    setWeightHistory(savedWeightHistory);
+    setWorkoutHistory(savedWorkoutHistory);
+    setExercisePRs(savedExercisePRs);
+
+    setActiveTheme(savedTheme);
+    document.documentElement.setAttribute("data-theme", savedTheme);
+
+    if (savedResetDate && savedResetDate !== todayStr) {
+      // Archive previous day's progress before resetting
+      const prevDateObj = new Date(savedResetDate);
+      const prevISO = !isNaN(prevDateObj.getTime()) ? getLocalISODate(prevDateObj) : getLocalISODate(new Date(Date.now() - 86400000));
+      const dayWorkouts = savedWorkoutHistory.filter((w) => w.date === prevISO);
+
+      if (savedCurrent.calories > 0 || savedWater > 0 || dayWorkouts.length > 0) {
+        const archivedEntry: DailyHistoryEntry = {
+          date: prevISO,
+          calories: savedCurrent.calories,
+          targetCalories: savedTarget.calories || 2000,
+          protein: savedCurrent.protein,
+          carbs: savedCurrent.carbs,
+          fats: savedCurrent.fats,
+          waterGlasses: savedWater,
+          weight: savedProfile.weight || undefined,
+          workoutsCompleted: dayWorkouts.length,
+          totalVolumeKg: dayWorkouts.reduce((acc, w) => acc + (w.totalVolumeKg || 0), 0),
+          readinessScore: savedReadiness?.date === prevISO ? savedReadiness.score : undefined
+        };
+        savedDailyHistory = [
+          ...savedDailyHistory.filter((e) => e.date !== prevISO),
+          archivedEntry
+        ].slice(-90);
+      }
+
       setCurrentMacros(defaultMacros);
       setLoggedFoods([]);
-      setLastResetDate(today);
       setWaterGlasses(0);
+      setTodayReadiness(null);
+      setLastResetDate(todayStr);
       localStorage.removeItem("fitmax_water");
+      localStorage.removeItem("fitmax_todayReadiness");
     } else {
-      // Same day, load current progress
-      if (savedCurrent) setCurrentMacros(JSON.parse(savedCurrent));
-      if (savedLogs) setLoggedFoods(JSON.parse(savedLogs));
+      setCurrentMacros(savedCurrent);
+      setLoggedFoods(savedLogs);
+      setWaterGlasses(isNaN(savedWater) ? 0 : savedWater);
       if (savedResetDate) setLastResetDate(savedResetDate);
-      if (savedWater) setWaterGlasses(Number(savedWater));
+      if (savedReadiness && savedReadiness.date === todayISO) {
+        setTodayReadiness(savedReadiness);
+      }
     }
-    
+
+    setDailyHistory(savedDailyHistory);
     setIsLoaded(true);
   }, []);
 
@@ -152,26 +392,40 @@ export const FitmaxProvider = ({ children }: { children: ReactNode }) => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
       if (currentUser) {
-        // Fetch cloud data
-        const docRef = doc(db, "users", currentUser.uid);
-        const docSnap = await getDoc(docRef);
-        if (docSnap.exists()) {
-          const data = docSnap.data();
-          if (data.profile) setProfile(data.profile);
-          if (data.targetMacros) setTargetMacros(data.targetMacros);
-          if (data.currentMacros) setCurrentMacros(data.currentMacros);
-          if (data.loggedFoods) setLoggedFoods(data.loggedFoods);
-          if (data.customDiet) setCustomDiet(data.customDiet);
-          if (data.xp !== undefined) setXp(data.xp);
-          if (data.streak !== undefined) setStreak(data.streak);
-          if (data.biometrics) setBiometrics(data.biometrics);
-          if (data.lastResetDate) setLastResetDate(data.lastResetDate);
-          if (data.activeTheme) {
-            setActiveTheme(data.activeTheme);
-            document.documentElement.setAttribute('data-theme', data.activeTheme);
+        try {
+          const docRef = doc(db, "users", currentUser.uid);
+          const docSnap = await getDoc(docRef);
+          if (docSnap.exists()) {
+            const data = docSnap.data();
+            if (data.profile) setProfile(data.profile);
+            if (data.targetMacros) setTargetMacros(data.targetMacros);
+            if (data.currentMacros) setCurrentMacros(data.currentMacros);
+            if (data.loggedFoods) setLoggedFoods(data.loggedFoods);
+            if (data.customDiet) setCustomDiet(data.customDiet);
+            if (data.customWorkoutPlan) setCustomWorkoutPlan(data.customWorkoutPlan);
+            if (data.xp !== undefined) setXp(data.xp);
+            if (data.streak !== undefined) setStreak(data.streak);
+            if (data.streakShields !== undefined) setStreakShields(data.streakShields);
+            if (data.lastActiveDate) setLastActiveDate(data.lastActiveDate);
+            if (data.waterGlasses !== undefined) setWaterGlasses(data.waterGlasses);
+            if (data.biometrics) setBiometrics(data.biometrics);
+            if (data.dailyHistory) setDailyHistory(data.dailyHistory);
+            if (data.weightHistory) setWeightHistory(data.weightHistory);
+            if (data.workoutHistory) setWorkoutHistory(data.workoutHistory);
+            if (data.exercisePRs) setExercisePRs(data.exercisePRs);
+            if (data.todayReadiness && data.todayReadiness.date === getLocalISODate()) {
+              setTodayReadiness(data.todayReadiness);
+            }
+            if (data.lastResetDate) setLastResetDate(data.lastResetDate);
+            if (data.activeTheme) {
+              setActiveTheme(data.activeTheme);
+              document.documentElement.setAttribute("data-theme", data.activeTheme);
+            }
           }
+          isCloudLoaded.current = true;
+        } catch (err) {
+          console.error("Cloud fetch error:", err);
         }
-        isCloudLoaded.current = true;
       } else {
         isCloudLoaded.current = false;
       }
@@ -181,63 +435,210 @@ export const FitmaxProvider = ({ children }: { children: ReactNode }) => {
 
   const loginWithGoogle = async () => {
     try {
-      await signInWithRedirect(auth, googleProvider);
+      await signInWithPopup(auth, googleProvider);
+      showToast("Sesión iniciada con Google", "success");
     } catch (error: any) {
+      if (error?.code === "auth/popup-blocked" || error?.code === "auth/cancelled-popup-request") {
+        try {
+          await signInWithRedirect(auth, googleProvider);
+          return;
+        } catch (redirectErr: any) {
+          console.error("Google redirect failed", redirectErr);
+        }
+      }
       console.error("Google login failed", error);
-      alert("Error al iniciar sesión: " + error.message);
+      showToast("No se pudo iniciar sesión con Google", "error");
     }
   };
 
   const logout = async () => {
     await signOut(auth);
-    // Optional: clear local state or reload
     window.location.reload();
   };
 
-  // Save to localStorage when state changes (only after initial load)
+  // Persist state to localStorage & Firestore
   useEffect(() => {
-    if (isLoaded) {
+    if (!isLoaded) return;
+    try {
       localStorage.setItem("fitmax_profile", JSON.stringify(profile));
       localStorage.setItem("fitmax_targetMacros", JSON.stringify(targetMacros));
       localStorage.setItem("fitmax_currentMacros", JSON.stringify(currentMacros));
-      localStorage.setItem("fitmax_loggedFoods", JSON.stringify(loggedFoods));
+      localStorage.setItem("fitmax_loggedFoods", JSON.stringify(loggedFoods.slice(0, 60)));
       localStorage.setItem("fitmax_customDiet", JSON.stringify(customDiet));
       localStorage.setItem("fitmax_customWorkoutPlan", JSON.stringify(customWorkoutPlan));
       localStorage.setItem("fitmax_xp", xp.toString());
       localStorage.setItem("fitmax_streak", streak.toString());
+      localStorage.setItem("fitmax_streakShields", streakShields.toString());
+      localStorage.setItem("fitmax_lastActiveDate", lastActiveDate);
       localStorage.setItem("fitmax_biometrics", JSON.stringify(biometrics));
       localStorage.setItem("fitmax_theme", activeTheme);
       localStorage.setItem("fitmax_lastResetDate", lastResetDate);
-      
-      // Sync to cloud if user is logged in and cloud is loaded
-      if (user && isCloudLoaded.current) {
-        setDoc(doc(db, "users", user.uid), {
-          profile, targetMacros, currentMacros, loggedFoods, customDiet, xp, streak, biometrics, activeTheme, lastResetDate
-        }, { merge: true });
+      localStorage.setItem("fitmax_water", waterGlasses.toString());
+      localStorage.setItem("fitmax_dailyHistory", JSON.stringify(dailyHistory.slice(-90)));
+      localStorage.setItem("fitmax_weightHistory", JSON.stringify(weightHistory.slice(-90)));
+      localStorage.setItem("fitmax_workoutHistory", JSON.stringify(workoutHistory.slice(-40)));
+      localStorage.setItem("fitmax_exercisePRs", JSON.stringify(exercisePRs));
+      if (todayReadiness) {
+        localStorage.setItem("fitmax_todayReadiness", JSON.stringify(todayReadiness));
       }
+
+      if (user && isCloudLoaded.current) {
+        setDoc(
+          doc(db, "users", user.uid),
+          {
+            profile,
+            targetMacros,
+            currentMacros,
+            loggedFoods: loggedFoods.slice(0, 40),
+            customDiet,
+            customWorkoutPlan,
+            xp,
+            streak,
+            streakShields,
+            lastActiveDate,
+            waterGlasses,
+            biometrics,
+            activeTheme,
+            lastResetDate,
+            dailyHistory: dailyHistory.slice(-60),
+            weightHistory: weightHistory.slice(-60),
+            workoutHistory: workoutHistory.slice(-30),
+            exercisePRs,
+            todayReadiness
+          },
+          { merge: true }
+        ).catch((err) => console.warn("Cloud sync error:", err));
+      }
+    } catch (storageErr) {
+      console.warn("Storage quota warning:", storageErr);
     }
-  }, [profile, targetMacros, currentMacros, loggedFoods, customDiet, xp, streak, biometrics, activeTheme, lastResetDate, isLoaded, user]);
+  }, [
+    profile,
+    targetMacros,
+    currentMacros,
+    loggedFoods,
+    customDiet,
+    customWorkoutPlan,
+    xp,
+    streak,
+    streakShields,
+    lastActiveDate,
+    waterGlasses,
+    biometrics,
+    activeTheme,
+    lastResetDate,
+    dailyHistory,
+    weightHistory,
+    workoutHistory,
+    exercisePRs,
+    todayReadiness,
+    isLoaded,
+    user
+  ]);
+
+  const addXp = useCallback((amount: number, label?: string) => {
+    setXp((prev) => {
+      const next = prev + amount;
+      const prevRankIdx = Math.min(Math.floor(prev / 200), RANKS.length - 1);
+      const nextRankIdx = Math.min(Math.floor(next / 200), RANKS.length - 1);
+      if (nextRankIdx > prevRankIdx) {
+        setLevelUpInfo({ rankName: RANKS[nextRankIdx], xp: next });
+      }
+      if (Math.floor(next / 500) > Math.floor(prev / 500)) {
+        setStreakShields((s) => s + 1);
+        showToast("🛡️ ¡Ganaste +1 Escudo de Racha!", "success");
+      }
+      return next;
+    });
+    showToast(`+${amount} XP${label ? ` • ${label}` : ""}`, "xp");
+  }, [showToast]);
+
+  const registerDailyActivity = useCallback(() => {
+    const todayISO = getLocalISODate();
+    if (lastActiveDate === todayISO) return;
+
+    const gap = diffDaysISO(lastActiveDate, todayISO);
+    if (!lastActiveDate) {
+      setStreak(1);
+      setLastActiveDate(todayISO);
+      showToast("🔥 ¡Día 1 de Racha iniciado!", "success");
+    } else if (gap === 1) {
+      setStreak((prev) => {
+        const next = prev + 1;
+        showToast(`🔥 ¡Racha aumentada a ${next} días!`, "success");
+        return next;
+      });
+      setLastActiveDate(todayISO);
+    } else if (gap === 2 && streakShields > 0) {
+      setStreakShields((s) => Math.max(0, s - 1));
+      setStreak((prev) => prev + 1);
+      setLastActiveDate(todayISO);
+      showToast("🛡️ Escudo Criogénico usado: ¡Tu racha sigue viva!", "warning");
+    } else {
+      setStreak(1);
+      setLastActiveDate(todayISO);
+    }
+  }, [lastActiveDate, streakShields, showToast]);
 
   const saveTheme = (theme: string) => {
     setActiveTheme(theme);
-    document.documentElement.setAttribute('data-theme', theme);
+    document.documentElement.setAttribute("data-theme", theme);
+    showToast("Tema visual aplicado", "success");
   };
 
   const setProfileAndCalculate = (profileData: UserProfile) => {
-    const updatedProfile = { ...profileData, avatar: profile.avatar };
+    const updatedProfile: UserProfile = {
+      ...profileData,
+      avatar: profileData.avatar ?? profile.avatar,
+      budget: profileData.budget ?? profile.budget ?? "Económico"
+    };
     setProfile(updatedProfile);
-    
+
     let leanMass: number | null = null;
     let bfValid: number | null = null;
 
+    // Accurate US Navy Body Fat formula for Women (hip included) & Men
     if (updatedProfile.weight && updatedProfile.height && updatedProfile.neck && updatedProfile.waist) {
-      const bf = 495 / (1.0324 - 0.19077 * Math.log10(updatedProfile.waist - updatedProfile.neck) + 0.15456 * Math.log10(updatedProfile.height)) - 450;
-      bfValid = Math.max(2, Math.min(bf, 60));
-      leanMass = updatedProfile.weight - (updatedProfile.weight * (bfValid / 100));
-      
-      setBiometrics({
-        bodyFatPercentage: Math.round(bfValid * 10) / 10,
-        leanMass: Math.round(leanMass * 10) / 10
+      let bf = 0;
+      if (updatedProfile.sex === "M" && updatedProfile.hip && (updatedProfile.waist + updatedProfile.hip - updatedProfile.neck > 0)) {
+        bf =
+          495 /
+            (1.29579 -
+              0.35004 * Math.log10(updatedProfile.waist + updatedProfile.hip - updatedProfile.neck) +
+              0.221 * Math.log10(updatedProfile.height)) -
+          450;
+      } else if (updatedProfile.waist - updatedProfile.neck > 0) {
+        bf =
+          495 /
+            (1.0324 -
+              0.19077 * Math.log10(updatedProfile.waist - updatedProfile.neck) +
+              0.15456 * Math.log10(updatedProfile.height)) -
+          450;
+      }
+
+      if (bf > 0) {
+        bfValid = Math.max(3, Math.min(bf, 60));
+        leanMass = updatedProfile.weight - updatedProfile.weight * (bfValid / 100);
+        setBiometrics({
+          bodyFatPercentage: Math.round(bfValid * 10) / 10,
+          leanMass: Math.round(leanMass * 10) / 10
+        });
+      }
+    }
+
+    // Track Weight History
+    if (updatedProfile.weight > 0) {
+      const todayISO = getLocalISODate();
+      setWeightHistory((prev) => {
+        const filtered = prev.filter((w) => w.date !== todayISO);
+        return [
+          ...filtered,
+          {
+            date: todayISO,
+            weight: updatedProfile.weight,
+            bodyFat: bfValid ? Math.round(bfValid * 10) / 10 : undefined
+          }
+        ].slice(-90);
       });
     }
 
@@ -245,89 +646,111 @@ export const FitmaxProvider = ({ children }: { children: ReactNode }) => {
 
     let bmr = 0;
     if (leanMass !== null) {
-      // Professional Katch-McArdle Formula (using Lean Body Mass)
-      bmr = 370 + (21.6 * leanMass);
+      bmr = 370 + 21.6 * leanMass;
     } else {
-      // Standard Mifflin-St Jeor Formula
       bmr = 10 * updatedProfile.weight + 6.25 * updatedProfile.height - 5 * updatedProfile.age;
       bmr += updatedProfile.sex === "H" ? 5 : -161;
     }
 
-    const multipliers = { "Sedentario": 1.2, "Ligero": 1.375, "Moderado": 1.55, "Intenso": 1.725 };
+    const multipliers: Record<Activity, number> = {
+      Sedentario: 1.2,
+      Ligero: 1.375,
+      Moderado: 1.55,
+      Intenso: 1.725
+    };
     const tdee = bmr * (multipliers[updatedProfile.activityLevel as Activity] || 1.2);
 
     let calories = tdee;
-    if (updatedProfile.goal === 'Perder Grasa') calories = tdee - 500;
-    if (updatedProfile.goal === 'Subir de Peso Limpio') calories = tdee + 300;
-    // Recomposición Corporal = Maintenance (TDEE)
+    if (updatedProfile.goal === "Perder Grasa") calories = tdee - 500;
+    if (updatedProfile.goal === "Subir de Peso Limpio") calories = tdee + 300;
 
     const protein = Math.round(updatedProfile.weight * 2.0);
     const fats = Math.round(updatedProfile.weight * 0.9);
-    
-    const proteinCals = protein * 4;
-    const fatsCals = fats * 9;
-    const carbsCals = calories - proteinCals - fatsCals;
+    const carbsCals = calories - protein * 4 - fats * 9;
     const carbs = Math.max(Math.round(carbsCals / 4), 50);
 
     setTargetMacros({
       calories: Math.round(calories),
       protein,
       carbs,
-      fats,
+      fats
     });
   };
 
-  const updateAvatar = (base64String: string) => {
-    setProfile(prev => ({ ...prev, avatar: base64String }));
+  const adjustTargetCalories = (delta: number, reason?: string) => {
+    setTargetMacros((prev) => {
+      const nextCals = Math.max(1200, (prev.calories || 2000) + delta);
+      const carbDelta = Math.round(delta / 4);
+      const nextCarbs = Math.max(40, (prev.carbs || 150) + carbDelta);
+      return {
+        ...prev,
+        calories: nextCals,
+        carbs: nextCarbs
+      };
+    });
+    showToast(reason || `Objetivo calórico ajustado (${delta > 0 ? "+" : ""}${delta} kcal)`, "success");
+  };
+
+  const updateAvatar = async (base64String: string) => {
+    const compressed = await compressThumbnail(base64String, 220, 0.65);
+    setProfile((prev) => ({ ...prev, avatar: compressed }));
+    showToast("Foto de perfil actualizada", "success");
   };
 
   const updateName = (newName: string) => {
-    setProfile(prev => ({ ...prev, name: newName }));
+    setProfile((prev) => ({ ...prev, name: newName }));
+    showToast("Nombre actualizado", "success");
   };
 
-  const addFoodLog = (food: FoodLog) => {
-    setCurrentMacros(prev => ({
-      protein: prev.protein + food.macros.protein,
-      carbs: prev.carbs + food.macros.carbs,
-      fats: prev.fats + food.macros.fats,
-      calories: prev.calories + food.macros.calories
+  const addFoodLog = async (food: FoodLog) => {
+    let finalImage = food.image;
+    if (finalImage && finalImage.startsWith("data:image")) {
+      finalImage = await compressThumbnail(finalImage, 160, 0.5);
+    }
+    const cleanFood: FoodLog = { ...food, image: finalImage };
+    setCurrentMacros((prev) => ({
+      protein: prev.protein + cleanFood.macros.protein,
+      carbs: prev.carbs + cleanFood.macros.carbs,
+      fats: prev.fats + cleanFood.macros.fats,
+      calories: prev.calories + cleanFood.macros.calories
     }));
-    setLoggedFoods(prev => [food, ...prev]);
-    setXp(prev => prev + 50);
+    setLoggedFoods((prev) => [cleanFood, ...prev]);
+    addXp(50, "Comida registrada");
+    registerDailyActivity();
   };
 
   const removeFoodLog = (id: string) => {
-    const foodToRemove = loggedFoods.find(f => f.id === id);
+    const foodToRemove = loggedFoods.find((f) => f.id === id);
     if (foodToRemove) {
-      setCurrentMacros(prev => ({
+      setCurrentMacros((prev) => ({
         protein: Math.max(0, prev.protein - foodToRemove.macros.protein),
         carbs: Math.max(0, prev.carbs - foodToRemove.macros.carbs),
         fats: Math.max(0, prev.fats - foodToRemove.macros.fats),
         calories: Math.max(0, prev.calories - foodToRemove.macros.calories)
       }));
-      setLoggedFoods(prev => prev.filter(f => f.id !== id));
+      setLoggedFoods((prev) => prev.filter((f) => f.id !== id));
+      showToast(`Eliminado: ${foodToRemove.name}`, "warning");
     }
   };
 
   const addWater = () => {
-    setWaterGlasses(prev => {
+    setWaterGlasses((prev) => {
       const next = prev + 1;
       localStorage.setItem("fitmax_water", next.toString());
+      if (next === 4) {
+        registerDailyActivity();
+      }
       return next;
     });
-    setXp(prev => prev + 10);
+    addXp(10, "Hidratación");
   };
 
   const removeWater = () => {
-    setWaterGlasses(prev => {
+    setWaterGlasses((prev) => {
       const next = Math.max(0, prev - 1);
       localStorage.setItem("fitmax_water", next.toString());
       return next;
     });
-  };
-
-  const addXp = (amount: number) => {
-    setXp(prev => prev + amount);
   };
 
   const saveDiet = (diet: any) => {
@@ -338,15 +761,143 @@ export const FitmaxProvider = ({ children }: { children: ReactNode }) => {
     setCustomWorkoutPlan(plan);
   };
 
+  const logWorkoutSession = (session: Omit<WorkoutSessionLog, "id" | "date">) => {
+    const todayISO = getLocalISODate();
+    const newLog: WorkoutSessionLog = {
+      ...session,
+      id: Date.now().toString(),
+      date: todayISO
+    };
+
+    setWorkoutHistory((prev) => [newLog, ...prev].slice(0, 40));
+
+    // Update Exercise PRs
+    if (session.exercises && session.exercises.length > 0) {
+      setExercisePRs((prev) => {
+        const next = { ...prev };
+        for (const ex of session.exercises) {
+          const completedSets = ex.sets.filter((s) => s.completed && s.weight > 0 && s.reps > 0);
+          if (completedSets.length === 0) continue;
+          let topSet = completedSets[0];
+          let top1RM = topSet.weight * (1 + topSet.reps / 30);
+          for (const s of completedSets) {
+            const est = s.weight * (1 + s.reps / 30);
+            if (est > top1RM) {
+              top1RM = est;
+              topSet = s;
+            }
+          }
+          const existing = next[ex.name];
+          if (!existing || top1RM > existing.best1RM) {
+            next[ex.name] = {
+              weight: topSet.weight,
+              reps: topSet.reps,
+              best1RM: Math.round(top1RM * 10) / 10,
+              date: todayISO
+            };
+          }
+        }
+        return next;
+      });
+    }
+
+    const totalXp = 100 + (session.prsCount || 0) * 25;
+    addXp(totalXp, session.prsCount > 0 ? `Entreno + ${session.prsCount} PR 🏆` : "Sesión completada");
+    registerDailyActivity();
+  };
+
+  const getLastExercisePerformance = (exerciseName: string): SetRecord[] | null => {
+    const normalized = exerciseName.toLowerCase().trim();
+    for (const session of workoutHistory) {
+      const match = session.exercises.find((e) => e.name.toLowerCase().trim() === normalized);
+      if (match && match.sets.length > 0) {
+        return match.sets;
+      }
+    }
+    return null;
+  };
+
+  const saveReadinessLog = (data: Omit<ReadinessLog, "date" | "score">) => {
+    const todayISO = getLocalISODate();
+    const sleepScore = Math.min(100, (data.sleepHours / 8) * 50 + data.sleepQuality * 5);
+    const fatigueComponent = (11 - data.fatigue) * 10;
+    const sorenessComponent = (11 - data.soreness) * 10;
+    const score = Math.round(
+      Math.max(10, Math.min(100, sleepScore * 0.4 + fatigueComponent * 0.35 + sorenessComponent * 0.25))
+    );
+
+    const entry: ReadinessLog = {
+      ...data,
+      date: todayISO,
+      score
+    };
+
+    const alreadyLoggedToday = todayReadiness?.date === todayISO;
+    setTodayReadiness(entry);
+    if (!alreadyLoggedToday) {
+      addXp(25, "Recuperación evaluada");
+    } else {
+      showToast(`Disposición actualizada: ${score}%`, "success");
+    }
+  };
+
   const resetProgress = () => {
     setCurrentMacros(defaultMacros);
     setLoggedFoods([]);
     setWaterGlasses(0);
     localStorage.removeItem("fitmax_water");
+    showToast("Registro diario reiniciado", "warning");
   };
 
   return (
-    <FitmaxContext.Provider value={{ isLoaded, profile, targetMacros, currentMacros, loggedFoods, biometrics, activeTheme, xp, streak, setProfileAndCalculate, updateAvatar, updateName, addFoodLog, removeFoodLog, waterGlasses, addWater, removeWater, addXp, saveTheme, customDiet, saveDiet, customWorkoutPlan, saveWorkoutPlan, resetProgress, user, loginWithGoogle, logout, lastResetDate }}>
+    <FitmaxContext.Provider
+      value={{
+        isLoaded,
+        profile,
+        targetMacros,
+        currentMacros,
+        loggedFoods,
+        biometrics,
+        activeTheme,
+        xp,
+        streak,
+        streakShields,
+        lastActiveDate,
+        dailyHistory,
+        weightHistory,
+        workoutHistory,
+        exercisePRs,
+        todayReadiness,
+        toasts,
+        levelUpInfo,
+        showToast,
+        dismissToast,
+        closeLevelUp,
+        setProfileAndCalculate,
+        adjustTargetCalories,
+        updateAvatar,
+        updateName,
+        addFoodLog,
+        removeFoodLog,
+        waterGlasses,
+        addWater,
+        removeWater,
+        addXp,
+        saveTheme,
+        customDiet,
+        saveDiet,
+        customWorkoutPlan,
+        saveWorkoutPlan,
+        logWorkoutSession,
+        getLastExercisePerformance,
+        saveReadinessLog,
+        resetProgress,
+        user,
+        loginWithGoogle,
+        logout,
+        lastResetDate
+      }}
+    >
       {children}
     </FitmaxContext.Provider>
   );
