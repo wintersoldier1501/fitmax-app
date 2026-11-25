@@ -6,8 +6,11 @@ import styles from "./profile.module.css";
 import { useFitmax } from "@/context/FitmaxContext";
 import { ProgressCharts } from "@/components/ProgressCharts";
 import { MuscleMap } from "@/components/MuscleMap";
+import { PhysiqueVault } from "@/components/PhysiqueVault";
+import { TrophyVault } from "@/components/TrophyVault";
+import { NotificationSettingsCard } from "@/components/PwaInstallBanner";
 import Link from "next/link";
-import { Camera, Edit2, Settings, Lock, ChevronRight, User, BarChart2, Sliders } from "lucide-react";
+import { Camera, Edit2, Settings, Lock, ChevronRight, User, BarChart2, Sliders, Trophy } from "lucide-react";
 
 const THEMES = [
   { id: "light", label: "Obsidian Crimson", color: "#FF3366", reqXp: 0, rank: "Inicial" },
@@ -35,7 +38,7 @@ export default function Profile() {
   } = useFitmax();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [tab, setTab] = useState<"analytics" | "settings">("analytics");
+  const [tab, setTab] = useState<"analytics" | "physique" | "settings">("analytics");
   const [isEditingName, setIsEditingName] = useState(false);
   const [tempName, setTempName] = useState("");
   const [isEditingMetrics, setIsEditingMetrics] = useState(false);
@@ -162,12 +165,12 @@ export default function Profile() {
         )}
       </section>
 
-      {/* Segmented Tabs */}
+      {/* 3-Tab Segmented Navigation */}
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "1fr 1fr",
-          gap: "0.4rem",
+          gridTemplateColumns: "repeat(3, 1fr)",
+          gap: "0.35rem",
           background: "var(--bg-surface)",
           border: "1px solid var(--border)",
           borderRadius: "14px",
@@ -177,36 +180,53 @@ export default function Profile() {
         <button
           onClick={() => setTab("analytics")}
           style={{
-            padding: "0.6rem",
+            padding: "0.55rem 0.3rem",
             borderRadius: "10px",
-            fontSize: "0.82rem",
+            fontSize: "0.75rem",
             fontWeight: tab === "analytics" ? 800 : 600,
             background: tab === "analytics" ? "var(--primary)" : "transparent",
             color: tab === "analytics" ? "white" : "var(--text-muted)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            gap: "0.4rem"
+            gap: "0.3rem"
           }}
         >
-          <BarChart2 size={15} /> Evolución & Mapa
+          <BarChart2 size={14} /> Evolución
+        </button>
+        <button
+          onClick={() => setTab("physique")}
+          style={{
+            padding: "0.55rem 0.3rem",
+            borderRadius: "10px",
+            fontSize: "0.75rem",
+            fontWeight: tab === "physique" ? 800 : 600,
+            background: tab === "physique" ? "var(--primary)" : "transparent",
+            color: tab === "physique" ? "white" : "var(--text-muted)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: "0.3rem"
+          }}
+        >
+          <Trophy size={14} /> Físico & Logros
         </button>
         <button
           onClick={() => setTab("settings")}
           style={{
-            padding: "0.6rem",
+            padding: "0.55rem 0.3rem",
             borderRadius: "10px",
-            fontSize: "0.82rem",
+            fontSize: "0.75rem",
             fontWeight: tab === "settings" ? 800 : 600,
             background: tab === "settings" ? "var(--primary)" : "transparent",
             color: tab === "settings" ? "white" : "var(--text-muted)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            gap: "0.4rem"
+            gap: "0.3rem"
           }}
         >
-          <Sliders size={15} /> Biometría & Temas
+          <Sliders size={14} /> Ajustes
         </button>
       </div>
 
@@ -214,6 +234,11 @@ export default function Profile() {
         <div style={{ display: "flex", flexDirection: "column", gap: "1.2rem" }}>
           <ProgressCharts />
           <MuscleMap />
+        </div>
+      ) : tab === "physique" ? (
+        <div style={{ display: "flex", flexDirection: "column", gap: "1.2rem" }}>
+          <PhysiqueVault />
+          <TrophyVault />
         </div>
       ) : (
         <>
@@ -290,7 +315,6 @@ export default function Profile() {
             </div>
           </section>
 
-          {/* Unlockable Themes */}
           <section>
             <h3 style={{ fontSize: "1.1rem", color: "white", marginBottom: "0.5rem" }}>Temas Obsidian Carbon ({xp} XP)</h3>
             <p style={{ fontSize: "0.84rem", color: "var(--text-muted)", marginBottom: "0.9rem" }}>
@@ -341,7 +365,8 @@ export default function Profile() {
             </div>
           </section>
 
-          {/* Cloud Sync */}
+          <NotificationSettingsCard />
+
           <section>
             <h3 style={{ fontSize: "1.1rem", color: "white", marginBottom: "0.75rem" }}>Sincronización en la Nube</h3>
             <div className="glass-card" style={{ padding: "1.3rem", display: "flex", flexDirection: "column", gap: "0.85rem" }}>

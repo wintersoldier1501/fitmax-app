@@ -53,6 +53,7 @@ export interface DailyHistoryEntry {
   carbs: number;
   fats: number;
   waterGlasses: number;
+  steps?: number;
   weight?: number;
   workoutsCompleted: number;
   totalVolumeKg: number;
@@ -60,18 +61,18 @@ export interface DailyHistoryEntry {
 }
 
 export interface WeightEntry {
-  date: string; // YYYY-MM-DD
+  date: string;
   weight: number;
   bodyFat?: number;
 }
 
 export interface ReadinessLog {
-  date: string; // YYYY-MM-DD
+  date: string;
   sleepHours: number;
-  sleepQuality: number; // 1-10
-  fatigue: number; // 1-10
-  soreness: number; // 1-10
-  score: number; // 0-100
+  sleepQuality: number;
+  fatigue: number;
+  soreness: number;
+  score: number;
   note: string;
 }
 
@@ -91,7 +92,7 @@ export interface ExerciseSessionRecord {
 
 export interface WorkoutSessionLog {
   id: string;
-  date: string; // YYYY-MM-DD
+  date: string;
   workoutName: string;
   durationMinutes: number;
   totalVolumeKg: number;
@@ -105,6 +106,34 @@ export interface ExercisePR {
   reps: number;
   best1RM: number;
   date: string;
+}
+
+export interface SupplementState {
+  date: string;
+  creatine: boolean;
+  caffeine: boolean;
+  omega3: boolean;
+  electrolytes: boolean;
+}
+
+export type SupplementKey = "creatine" | "caffeine" | "omega3" | "electrolytes";
+
+export interface CardioSessionLog {
+  id: string;
+  date: string;
+  type: "Zona 2" | "Running" | "HIIT" | "Caminata Inclinada";
+  durationMin: number;
+  distanceKm?: number;
+  caloriesBurned: number;
+}
+
+export interface PhysiquePhoto {
+  id: string;
+  date: string;
+  weight?: number;
+  bodyFatEst?: string;
+  notes?: string;
+  image: string;
 }
 
 export interface ToastItem {
@@ -124,6 +153,8 @@ interface FitmaxState {
   targetMacros: Macros;
   currentMacros: Macros;
   loggedFoods: FoodLog[];
+  favoriteMeals: FoodLog[];
+  yesterdayFoods: FoodLog[];
   biometrics: Biometrics;
   activeTheme: string;
   xp: number;
@@ -135,6 +166,13 @@ interface FitmaxState {
   workoutHistory: WorkoutSessionLog[];
   exercisePRs: Record<string, ExercisePR>;
   todayReadiness: ReadinessLog | null;
+  todaySupplements: SupplementState;
+  creatineStreak: number;
+  dailySteps: number;
+  stepsGoal: number;
+  cardioHistory: CardioSessionLog[];
+  trifectaClaimedDate: string;
+  physiquePhotos: PhysiquePhoto[];
   toasts: ToastItem[];
   levelUpInfo: LevelUpInfo | null;
   showToast: (message: string, type?: ToastItem["type"]) => void;
@@ -146,6 +184,8 @@ interface FitmaxState {
   updateName: (newName: string) => void;
   addFoodLog: (food: FoodLog) => void;
   removeFoodLog: (id: string) => void;
+  toggleFavoriteMeal: (food: FoodLog) => void;
+  repeatYesterdayMeals: () => void;
   waterGlasses: number;
   addWater: () => void;
   removeWater: () => void;
@@ -158,6 +198,12 @@ interface FitmaxState {
   logWorkoutSession: (session: Omit<WorkoutSessionLog, "id" | "date">) => void;
   getLastExercisePerformance: (exerciseName: string) => SetRecord[] | null;
   saveReadinessLog: (data: Omit<ReadinessLog, "date" | "score">) => void;
+  toggleSupplement: (key: SupplementKey) => void;
+  updateDailySteps: (steps: number) => void;
+  logCardioSession: (session: Omit<CardioSessionLog, "id" | "date">) => void;
+  claimDailyTrifecta: () => void;
+  addPhysiquePhoto: (photo: Omit<PhysiquePhoto, "id">) => Promise<void>;
+  removePhysiquePhoto: (id: string) => void;
   resetProgress: () => void;
   user: User | null;
   loginWithGoogle: () => Promise<void>;
@@ -189,6 +235,14 @@ const defaultProfile: UserProfile = {
 };
 
 const defaultMacros: Macros = { protein: 0, carbs: 0, fats: 0, calories: 0 };
+
+const defaultSupplements = (dateISO: string): SupplementState => ({
+  date: dateISO,
+  creatine: false,
+  caffeine: false,
+  omega3: false,
+  electrolytes: false
+});
 
 const FitmaxContext = createContext<FitmaxState | undefined>(undefined);
 
@@ -258,6 +312,8 @@ export const FitmaxProvider = ({ children }: { children: ReactNode }) => {
   const [targetMacros, setTargetMacros] = useState<Macros>(defaultMacros);
   const [currentMacros, setCurrentMacros] = useState<Macros>(defaultMacros);
   const [loggedFoods, setLoggedFoods] = useState<FoodLog[]>([]);
+  const [favoriteMeals, setFavoriteMeals] = useState<FoodLog[]>([]);
+  const [yesterdayFoods, setYesterdayFoods] = useState<FoodLog[]>([]);
   const [customDiet, setCustomDiet] = useState<any>(null);
   const [customWorkoutPlan, setCustomWorkoutPlan] = useState<any>(null);
   const [xp, setXp] = useState(0);
@@ -275,6 +331,16 @@ export const FitmaxProvider = ({ children }: { children: ReactNode }) => {
   const [workoutHistory, setWorkoutHistory] = useState<WorkoutSessionLog[]>([]);
   const [exercisePRs, setExercisePRs] = useState<Record<string, ExercisePR>>({});
   const [todayReadiness, setTodayReadiness] = useState<ReadinessLog | null>(null);
+
+  const [todaySupplements, setTodaySupplements] = useState<SupplementState>(() => defaultSupplements(getLocalISODate()));
+  const [creatineStreak, setCreatineStreak] = useState(0);
+  const [lastCreatineDate, setLastCreatineDate] = useState("");
+  const [dailySteps, setDailySteps] = useState(0);
+  const [stepsGoal] = useState(10000);
+  const [stepsXpDate, setStepsXpDate] = useState("");
+  const [cardioHistory, setCardioHistory] = useState<CardioSessionLog[]>([]);
+  const [trifectaClaimedDate, setTrifectaClaimedDate] = useState("");
+  const [physiquePhotos, setPhysiquePhotos] = useState<PhysiquePhoto[]>([]);
 
   const [toasts, setToasts] = useState<ToastItem[]>([]);
   const [levelUpInfo, setLevelUpInfo] = useState<LevelUpInfo | null>(null);
@@ -299,10 +365,15 @@ export const FitmaxProvider = ({ children }: { children: ReactNode }) => {
 
   // Load from localStorage on mount & perform midnight history archiving
   useEffect(() => {
+    const todayStr = new Date().toDateString();
+    const todayISO = getLocalISODate();
+
     const savedProfile = safeParse<UserProfile>(localStorage.getItem("fitmax_profile"), defaultProfile);
     const savedTarget = safeParse<Macros>(localStorage.getItem("fitmax_targetMacros"), defaultMacros);
     const savedCurrent = safeParse<Macros>(localStorage.getItem("fitmax_currentMacros"), defaultMacros);
     const savedLogs = safeParse<FoodLog[]>(localStorage.getItem("fitmax_loggedFoods"), []);
+    const savedFavorites = safeParse<FoodLog[]>(localStorage.getItem("fitmax_favoriteMeals"), []);
+    let savedYesterday = safeParse<FoodLog[]>(localStorage.getItem("fitmax_yesterdayFoods"), []);
     const savedDiet = safeParse<any>(localStorage.getItem("fitmax_customDiet"), null);
     const savedWorkoutPlan = safeParse<any>(localStorage.getItem("fitmax_customWorkoutPlan"), null);
     const savedXp = Number(localStorage.getItem("fitmax_xp") || 0);
@@ -321,11 +392,18 @@ export const FitmaxProvider = ({ children }: { children: ReactNode }) => {
     const savedExercisePRs = safeParse<Record<string, ExercisePR>>(localStorage.getItem("fitmax_exercisePRs"), {});
     const savedReadiness = safeParse<ReadinessLog | null>(localStorage.getItem("fitmax_todayReadiness"), null);
 
-    const todayStr = new Date().toDateString();
-    const todayISO = getLocalISODate();
+    const savedSupps = safeParse<SupplementState>(localStorage.getItem("fitmax_todaySupplements"), defaultSupplements(todayISO));
+    const savedCreatineStreak = Number(localStorage.getItem("fitmax_creatineStreak") || 0);
+    const savedLastCreatineDate = localStorage.getItem("fitmax_lastCreatineDate") || "";
+    const savedSteps = Number(localStorage.getItem("fitmax_dailySteps") || 0);
+    const savedStepsXpDate = localStorage.getItem("fitmax_stepsXpDate") || "";
+    const savedCardio = safeParse<CardioSessionLog[]>(localStorage.getItem("fitmax_cardioHistory"), []);
+    const savedTrifecta = localStorage.getItem("fitmax_trifectaClaimedDate") || "";
+    const savedPhotos = safeParse<PhysiquePhoto[]>(localStorage.getItem("fitmax_physiquePhotos"), []);
 
     setProfile(savedProfile);
     setTargetMacros(savedTarget);
+    setFavoriteMeals(savedFavorites);
     setCustomDiet(savedDiet);
     setCustomWorkoutPlan(savedWorkoutPlan);
     setXp(isNaN(savedXp) ? 0 : savedXp);
@@ -336,17 +414,22 @@ export const FitmaxProvider = ({ children }: { children: ReactNode }) => {
     setWeightHistory(savedWeightHistory);
     setWorkoutHistory(savedWorkoutHistory);
     setExercisePRs(savedExercisePRs);
+    setCreatineStreak(isNaN(savedCreatineStreak) ? 0 : savedCreatineStreak);
+    setLastCreatineDate(savedLastCreatineDate);
+    setStepsXpDate(savedStepsXpDate);
+    setCardioHistory(savedCardio);
+    setTrifectaClaimedDate(savedTrifecta);
+    setPhysiquePhotos(savedPhotos);
 
     setActiveTheme(savedTheme);
     document.documentElement.setAttribute("data-theme", savedTheme);
 
     if (savedResetDate && savedResetDate !== todayStr) {
-      // Archive previous day's progress before resetting
       const prevDateObj = new Date(savedResetDate);
       const prevISO = !isNaN(prevDateObj.getTime()) ? getLocalISODate(prevDateObj) : getLocalISODate(new Date(Date.now() - 86400000));
       const dayWorkouts = savedWorkoutHistory.filter((w) => w.date === prevISO);
 
-      if (savedCurrent.calories > 0 || savedWater > 0 || dayWorkouts.length > 0) {
+      if (savedCurrent.calories > 0 || savedWater > 0 || savedSteps > 0 || dayWorkouts.length > 0) {
         const archivedEntry: DailyHistoryEntry = {
           date: prevISO,
           calories: savedCurrent.calories,
@@ -355,6 +438,7 @@ export const FitmaxProvider = ({ children }: { children: ReactNode }) => {
           carbs: savedCurrent.carbs,
           fats: savedCurrent.fats,
           waterGlasses: savedWater,
+          steps: savedSteps,
           weight: savedProfile.weight || undefined,
           workoutsCompleted: dayWorkouts.length,
           totalVolumeKg: dayWorkouts.reduce((acc, w) => acc + (w.totalVolumeKg || 0), 0),
@@ -366,23 +450,38 @@ export const FitmaxProvider = ({ children }: { children: ReactNode }) => {
         ].slice(-90);
       }
 
+      if (savedLogs.length > 0) {
+        savedYesterday = savedLogs.slice(0, 12);
+        localStorage.setItem("fitmax_yesterdayFoods", JSON.stringify(savedYesterday));
+      }
+
       setCurrentMacros(defaultMacros);
       setLoggedFoods([]);
       setWaterGlasses(0);
+      setDailySteps(0);
       setTodayReadiness(null);
+      setTodaySupplements(defaultSupplements(todayISO));
       setLastResetDate(todayStr);
       localStorage.removeItem("fitmax_water");
+      localStorage.removeItem("fitmax_dailySteps");
       localStorage.removeItem("fitmax_todayReadiness");
     } else {
       setCurrentMacros(savedCurrent);
       setLoggedFoods(savedLogs);
       setWaterGlasses(isNaN(savedWater) ? 0 : savedWater);
+      setDailySteps(isNaN(savedSteps) ? 0 : savedSteps);
       if (savedResetDate) setLastResetDate(savedResetDate);
       if (savedReadiness && savedReadiness.date === todayISO) {
         setTodayReadiness(savedReadiness);
       }
+      if (savedSupps && savedSupps.date === todayISO) {
+        setTodaySupplements(savedSupps);
+      } else {
+        setTodaySupplements(defaultSupplements(todayISO));
+      }
     }
 
+    setYesterdayFoods(savedYesterday);
     setDailyHistory(savedDailyHistory);
     setIsLoaded(true);
   }, []);
@@ -397,10 +496,13 @@ export const FitmaxProvider = ({ children }: { children: ReactNode }) => {
           const docSnap = await getDoc(docRef);
           if (docSnap.exists()) {
             const data = docSnap.data();
+            const todayISO = getLocalISODate();
             if (data.profile) setProfile(data.profile);
             if (data.targetMacros) setTargetMacros(data.targetMacros);
             if (data.currentMacros) setCurrentMacros(data.currentMacros);
             if (data.loggedFoods) setLoggedFoods(data.loggedFoods);
+            if (data.favoriteMeals) setFavoriteMeals(data.favoriteMeals);
+            if (data.yesterdayFoods) setYesterdayFoods(data.yesterdayFoods);
             if (data.customDiet) setCustomDiet(data.customDiet);
             if (data.customWorkoutPlan) setCustomWorkoutPlan(data.customWorkoutPlan);
             if (data.xp !== undefined) setXp(data.xp);
@@ -408,14 +510,18 @@ export const FitmaxProvider = ({ children }: { children: ReactNode }) => {
             if (data.streakShields !== undefined) setStreakShields(data.streakShields);
             if (data.lastActiveDate) setLastActiveDate(data.lastActiveDate);
             if (data.waterGlasses !== undefined) setWaterGlasses(data.waterGlasses);
+            if (data.dailySteps !== undefined) setDailySteps(data.dailySteps);
+            if (data.creatineStreak !== undefined) setCreatineStreak(data.creatineStreak);
+            if (data.lastCreatineDate) setLastCreatineDate(data.lastCreatineDate);
+            if (data.cardioHistory) setCardioHistory(data.cardioHistory);
+            if (data.trifectaClaimedDate) setTrifectaClaimedDate(data.trifectaClaimedDate);
             if (data.biometrics) setBiometrics(data.biometrics);
             if (data.dailyHistory) setDailyHistory(data.dailyHistory);
             if (data.weightHistory) setWeightHistory(data.weightHistory);
             if (data.workoutHistory) setWorkoutHistory(data.workoutHistory);
             if (data.exercisePRs) setExercisePRs(data.exercisePRs);
-            if (data.todayReadiness && data.todayReadiness.date === getLocalISODate()) {
-              setTodayReadiness(data.todayReadiness);
-            }
+            if (data.todayReadiness && data.todayReadiness.date === todayISO) setTodayReadiness(data.todayReadiness);
+            if (data.todaySupplements && data.todaySupplements.date === todayISO) setTodaySupplements(data.todaySupplements);
             if (data.lastResetDate) setLastResetDate(data.lastResetDate);
             if (data.activeTheme) {
               setActiveTheme(data.activeTheme);
@@ -456,7 +562,7 @@ export const FitmaxProvider = ({ children }: { children: ReactNode }) => {
     window.location.reload();
   };
 
-  // Persist state to localStorage & Firestore
+  // Persist state to localStorage & Firestore (physiquePhotos stay strictly local to respect Firestore 1MB doc limit)
   useEffect(() => {
     if (!isLoaded) return;
     try {
@@ -464,6 +570,8 @@ export const FitmaxProvider = ({ children }: { children: ReactNode }) => {
       localStorage.setItem("fitmax_targetMacros", JSON.stringify(targetMacros));
       localStorage.setItem("fitmax_currentMacros", JSON.stringify(currentMacros));
       localStorage.setItem("fitmax_loggedFoods", JSON.stringify(loggedFoods.slice(0, 60)));
+      localStorage.setItem("fitmax_favoriteMeals", JSON.stringify(favoriteMeals.slice(0, 20)));
+      localStorage.setItem("fitmax_yesterdayFoods", JSON.stringify(yesterdayFoods.slice(0, 12)));
       localStorage.setItem("fitmax_customDiet", JSON.stringify(customDiet));
       localStorage.setItem("fitmax_customWorkoutPlan", JSON.stringify(customWorkoutPlan));
       localStorage.setItem("fitmax_xp", xp.toString());
@@ -474,10 +582,18 @@ export const FitmaxProvider = ({ children }: { children: ReactNode }) => {
       localStorage.setItem("fitmax_theme", activeTheme);
       localStorage.setItem("fitmax_lastResetDate", lastResetDate);
       localStorage.setItem("fitmax_water", waterGlasses.toString());
+      localStorage.setItem("fitmax_dailySteps", dailySteps.toString());
+      localStorage.setItem("fitmax_stepsXpDate", stepsXpDate);
+      localStorage.setItem("fitmax_todaySupplements", JSON.stringify(todaySupplements));
+      localStorage.setItem("fitmax_creatineStreak", creatineStreak.toString());
+      localStorage.setItem("fitmax_lastCreatineDate", lastCreatineDate);
+      localStorage.setItem("fitmax_cardioHistory", JSON.stringify(cardioHistory.slice(0, 40)));
+      localStorage.setItem("fitmax_trifectaClaimedDate", trifectaClaimedDate);
       localStorage.setItem("fitmax_dailyHistory", JSON.stringify(dailyHistory.slice(-90)));
       localStorage.setItem("fitmax_weightHistory", JSON.stringify(weightHistory.slice(-90)));
       localStorage.setItem("fitmax_workoutHistory", JSON.stringify(workoutHistory.slice(-40)));
       localStorage.setItem("fitmax_exercisePRs", JSON.stringify(exercisePRs));
+      localStorage.setItem("fitmax_physiquePhotos", JSON.stringify(physiquePhotos.slice(0, 12)));
       if (todayReadiness) {
         localStorage.setItem("fitmax_todayReadiness", JSON.stringify(todayReadiness));
       }
@@ -489,7 +605,9 @@ export const FitmaxProvider = ({ children }: { children: ReactNode }) => {
             profile,
             targetMacros,
             currentMacros,
-            loggedFoods: loggedFoods.slice(0, 40),
+            loggedFoods: loggedFoods.slice(0, 35),
+            favoriteMeals: favoriteMeals.slice(0, 15),
+            yesterdayFoods: yesterdayFoods.slice(0, 10),
             customDiet,
             customWorkoutPlan,
             xp,
@@ -497,6 +615,12 @@ export const FitmaxProvider = ({ children }: { children: ReactNode }) => {
             streakShields,
             lastActiveDate,
             waterGlasses,
+            dailySteps,
+            todaySupplements,
+            creatineStreak,
+            lastCreatineDate,
+            cardioHistory: cardioHistory.slice(0, 30),
+            trifectaClaimedDate,
             biometrics,
             activeTheme,
             lastResetDate,
@@ -517,6 +641,8 @@ export const FitmaxProvider = ({ children }: { children: ReactNode }) => {
     targetMacros,
     currentMacros,
     loggedFoods,
+    favoriteMeals,
+    yesterdayFoods,
     customDiet,
     customWorkoutPlan,
     xp,
@@ -524,6 +650,13 @@ export const FitmaxProvider = ({ children }: { children: ReactNode }) => {
     streakShields,
     lastActiveDate,
     waterGlasses,
+    dailySteps,
+    stepsXpDate,
+    todaySupplements,
+    creatineStreak,
+    lastCreatineDate,
+    cardioHistory,
+    trifectaClaimedDate,
     biometrics,
     activeTheme,
     lastResetDate,
@@ -531,6 +664,7 @@ export const FitmaxProvider = ({ children }: { children: ReactNode }) => {
     weightHistory,
     workoutHistory,
     exercisePRs,
+    physiquePhotos,
     todayReadiness,
     isLoaded,
     user
@@ -597,10 +731,9 @@ export const FitmaxProvider = ({ children }: { children: ReactNode }) => {
     let leanMass: number | null = null;
     let bfValid: number | null = null;
 
-    // Accurate US Navy Body Fat formula for Women (hip included) & Men
     if (updatedProfile.weight && updatedProfile.height && updatedProfile.neck && updatedProfile.waist) {
       let bf = 0;
-      if (updatedProfile.sex === "M" && updatedProfile.hip && (updatedProfile.waist + updatedProfile.hip - updatedProfile.neck > 0)) {
+      if (updatedProfile.sex === "M" && updatedProfile.hip && updatedProfile.waist + updatedProfile.hip - updatedProfile.neck > 0) {
         bf =
           495 /
             (1.29579 -
@@ -626,7 +759,6 @@ export const FitmaxProvider = ({ children }: { children: ReactNode }) => {
       }
     }
 
-    // Track Weight History
     if (updatedProfile.weight > 0) {
       const todayISO = getLocalISODate();
       setWeightHistory((prev) => {
@@ -733,13 +865,58 @@ export const FitmaxProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const toggleFavoriteMeal = (food: FoodLog) => {
+    const norm = food.name.toLowerCase().trim();
+    const exists = favoriteMeals.some((f) => f.name.toLowerCase().trim() === norm);
+    if (exists) {
+      setFavoriteMeals((prev) => prev.filter((f) => f.name.toLowerCase().trim() !== norm));
+      showToast("Quitado de Favoritos", "warning");
+    } else {
+      const cleanCopy: FoodLog = {
+        id: `fav_${Date.now()}`,
+        name: food.name,
+        macros: { ...food.macros },
+        time: food.time
+      };
+      setFavoriteMeals((prev) => [cleanCopy, ...prev].slice(0, 20));
+      showToast("⭐ Guardado en Comidas Favoritas", "success");
+    }
+  };
+
+  const repeatYesterdayMeals = () => {
+    if (yesterdayFoods.length === 0) {
+      showToast("No hay comidas guardadas de ayer para repetir", "warning");
+      return;
+    }
+    const nowTime = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    let addP = 0;
+    let addC = 0;
+    let addF = 0;
+    let addCal = 0;
+    const cloned = yesterdayFoods.map((f, idx) => {
+      addP += f.macros.protein;
+      addC += f.macros.carbs;
+      addF += f.macros.fats;
+      addCal += f.macros.calories;
+      return { ...f, id: `${Date.now()}_${idx}`, time: nowTime };
+    });
+
+    setCurrentMacros((prev) => ({
+      protein: prev.protein + addP,
+      carbs: prev.carbs + addC,
+      fats: prev.fats + addF,
+      calories: prev.calories + addCal
+    }));
+    setLoggedFoods((prev) => [...cloned, ...prev]);
+    addXp(50, `Ayer repetido (${cloned.length} comidas)`);
+    registerDailyActivity();
+  };
+
   const addWater = () => {
     setWaterGlasses((prev) => {
       const next = prev + 1;
       localStorage.setItem("fitmax_water", next.toString());
-      if (next === 4) {
-        registerDailyActivity();
-      }
+      if (next === 4) registerDailyActivity();
       return next;
     });
     addXp(10, "Hidratación");
@@ -753,13 +930,8 @@ export const FitmaxProvider = ({ children }: { children: ReactNode }) => {
     });
   };
 
-  const saveDiet = (diet: any) => {
-    setCustomDiet(diet);
-  };
-
-  const saveWorkoutPlan = (plan: any) => {
-    setCustomWorkoutPlan(plan);
-  };
+  const saveDiet = (diet: any) => setCustomDiet(diet);
+  const saveWorkoutPlan = (plan: any) => setCustomWorkoutPlan(plan);
 
   const logWorkoutSession = (session: Omit<WorkoutSessionLog, "id" | "date">) => {
     const todayISO = getLocalISODate();
@@ -771,7 +943,6 @@ export const FitmaxProvider = ({ children }: { children: ReactNode }) => {
 
     setWorkoutHistory((prev) => [newLog, ...prev].slice(0, 40));
 
-    // Update Exercise PRs
     if (session.exercises && session.exercises.length > 0) {
       setExercisePRs((prev) => {
         const next = { ...prev };
@@ -810,9 +981,7 @@ export const FitmaxProvider = ({ children }: { children: ReactNode }) => {
     const normalized = exerciseName.toLowerCase().trim();
     for (const session of workoutHistory) {
       const match = session.exercises.find((e) => e.name.toLowerCase().trim() === normalized);
-      if (match && match.sets.length > 0) {
-        return match.sets;
-      }
+      if (match && match.sets.length > 0) return match.sets;
     }
     return null;
   };
@@ -826,12 +995,7 @@ export const FitmaxProvider = ({ children }: { children: ReactNode }) => {
       Math.max(10, Math.min(100, sleepScore * 0.4 + fatigueComponent * 0.35 + sorenessComponent * 0.25))
     );
 
-    const entry: ReadinessLog = {
-      ...data,
-      date: todayISO,
-      score
-    };
-
+    const entry: ReadinessLog = { ...data, date: todayISO, score };
     const alreadyLoggedToday = todayReadiness?.date === todayISO;
     setTodayReadiness(entry);
     if (!alreadyLoggedToday) {
@@ -841,11 +1005,82 @@ export const FitmaxProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const toggleSupplement = (key: SupplementKey) => {
+    const todayISO = getLocalISODate();
+    setTodaySupplements((prev) => {
+      const base = prev.date === todayISO ? prev : defaultSupplements(todayISO);
+      const nextVal = !base[key];
+      const nextState = { ...base, date: todayISO, [key]: nextVal };
+
+      if (key === "creatine" && nextVal && lastCreatineDate !== todayISO) {
+        const gap = diffDaysISO(lastCreatineDate, todayISO);
+        setCreatineStreak((cs) => (!lastCreatineDate || gap <= 2 ? cs + 1 : 1));
+        setLastCreatineDate(todayISO);
+        addXp(15, "Creatina 5g ✓");
+      } else if (nextVal) {
+        showToast(`Suplemento marcado ✓`, "success");
+      }
+      return nextState;
+    });
+  };
+
+  const updateDailySteps = (steps: number) => {
+    const cleanSteps = Math.max(0, Math.round(steps));
+    const todayISO = getLocalISODate();
+    setDailySteps(cleanSteps);
+    if (cleanSteps >= stepsGoal && stepsXpDate !== todayISO) {
+      setStepsXpDate(todayISO);
+      addXp(40, `Meta ${stepsGoal.toLocaleString()} pasos 🏃`);
+      registerDailyActivity();
+    }
+  };
+
+  const logCardioSession = (session: Omit<CardioSessionLog, "id" | "date">) => {
+    const todayISO = getLocalISODate();
+    const entry: CardioSessionLog = {
+      ...session,
+      id: Date.now().toString(),
+      date: todayISO
+    };
+    setCardioHistory((prev) => [entry, ...prev].slice(0, 40));
+    addXp(60, `Cardio ${session.type}`);
+    registerDailyActivity();
+  };
+
+  const claimDailyTrifecta = () => {
+    const todayISO = getLocalISODate();
+    if (trifectaClaimedDate === todayISO) {
+      showToast("Ya reclamaste tu Cofre Trifecta de hoy", "warning");
+      return;
+    }
+    setTrifectaClaimedDate(todayISO);
+    setStreakShields((s) => s + 1);
+    addXp(150, "Cofre Trifecta +1 Escudo 🏆");
+  };
+
+  const addPhysiquePhoto = async (photo: Omit<PhysiquePhoto, "id">) => {
+    const compressed = await compressThumbnail(photo.image, 380, 0.58);
+    const newPhoto: PhysiquePhoto = {
+      ...photo,
+      id: Date.now().toString(),
+      image: compressed
+    };
+    setPhysiquePhotos((prev) => [newPhoto, ...prev].slice(0, 12));
+    addXp(75, "Progreso físico guardado 📸");
+  };
+
+  const removePhysiquePhoto = (id: string) => {
+    setPhysiquePhotos((prev) => prev.filter((p) => p.id !== id));
+    showToast("Foto eliminada de tu bóveda", "warning");
+  };
+
   const resetProgress = () => {
     setCurrentMacros(defaultMacros);
     setLoggedFoods([]);
     setWaterGlasses(0);
+    setDailySteps(0);
     localStorage.removeItem("fitmax_water");
+    localStorage.removeItem("fitmax_dailySteps");
     showToast("Registro diario reiniciado", "warning");
   };
 
@@ -857,6 +1092,8 @@ export const FitmaxProvider = ({ children }: { children: ReactNode }) => {
         targetMacros,
         currentMacros,
         loggedFoods,
+        favoriteMeals,
+        yesterdayFoods,
         biometrics,
         activeTheme,
         xp,
@@ -868,6 +1105,13 @@ export const FitmaxProvider = ({ children }: { children: ReactNode }) => {
         workoutHistory,
         exercisePRs,
         todayReadiness,
+        todaySupplements,
+        creatineStreak,
+        dailySteps,
+        stepsGoal,
+        cardioHistory,
+        trifectaClaimedDate,
+        physiquePhotos,
         toasts,
         levelUpInfo,
         showToast,
@@ -879,6 +1123,8 @@ export const FitmaxProvider = ({ children }: { children: ReactNode }) => {
         updateName,
         addFoodLog,
         removeFoodLog,
+        toggleFavoriteMeal,
+        repeatYesterdayMeals,
         waterGlasses,
         addWater,
         removeWater,
@@ -891,6 +1137,12 @@ export const FitmaxProvider = ({ children }: { children: ReactNode }) => {
         logWorkoutSession,
         getLastExercisePerformance,
         saveReadinessLog,
+        toggleSupplement,
+        updateDailySteps,
+        logCardioSession,
+        claimDailyTrifecta,
+        addPhysiquePhoto,
+        removePhysiquePhoto,
         resetProgress,
         user,
         loginWithGoogle,

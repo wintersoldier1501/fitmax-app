@@ -21,9 +21,9 @@ export async function POST(req: Request) {
     const base64Data = image.split(",")[1] || image;
     const mimeType = image.split(";")[0].split(":")[1] || "image/jpeg";
 
-    const prompt =
-      mode === "label"
-        ? `
+    let prompt = "";
+    if (mode === "label") {
+      prompt = `
 Eres un lector OCR de tablas nutrimentales experto. Analiza la etiqueta nutricional en esta fotografía y extrae los valores por porción declarada (o por 100g si no hay porción clara).
 Responde ÚNICAMENTE con un objeto JSON válido, sin formato Markdown:
 {
@@ -34,8 +34,21 @@ Responde ÚNICAMENTE con un objeto JSON válido, sin formato Markdown:
   "fats": <entero gramos>,
   "calories": <entero kcal>
 }
-`
-        : `
+`;
+    } else if (mode === "physique") {
+      prompt = `
+Eres un coach de élite en estética corporal, culturismo natural y recomposición física. Analiza de manera constructiva, objetiva y motivadora esta foto de progreso físico.
+Responde ÚNICAMENTE con un objeto JSON válido, sin formato Markdown:
+{
+  "bodyFatRange": "Estimación visual aproximada (ej. 14% - 16%)",
+  "vTaperScore": "Puntuación visual hombro-cintura (ej. 8.1 / 10)",
+  "strongPoints": ["Punto fuerte 1", "Punto fuerte 2"],
+  "priorityAreas": ["Área prioritaria 1 para potenciar estética", "Área prioritaria 2"],
+  "coachAdvice": "Consejo científico y constructivo de 2 oraciones sobre qué priorizar en su próximo mesociclo."
+}
+`;
+    } else {
+      prompt = `
 Eres un nutricionista experto en visión por computadora. Analiza la comida en esta imagen, desglosa los ingredientes visibles y calcula sus macronutrientes totales.
 Responde ÚNICAMENTE con un objeto JSON válido, sin formato Markdown:
 {
@@ -57,6 +70,7 @@ Responde ÚNICAMENTE con un objeto JSON válido, sin formato Markdown:
 }
 Si la imagen no parece comida, devuelve valores en 0 pero siempre en formato JSON válido.
 `;
+    }
 
     const imageParts = [
       {

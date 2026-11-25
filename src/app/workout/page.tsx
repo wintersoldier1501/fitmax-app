@@ -3,11 +3,13 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import styles from "./workout.module.css";
-import { useFitmax, SetRecord, ExerciseSessionRecord } from "@/context/FitmaxContext";
+import { useFitmax, SetRecord, ExerciseSessionRecord, RANKS } from "@/context/FitmaxContext";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { DailyWisdom } from "@/components/DailyWisdom";
 import { MuscleMap } from "@/components/MuscleMap";
+import { GymTacticalModal } from "@/components/GymTacticalModal";
+import { ShareCardModal } from "@/components/ShareCardModal";
 import {
   Sparkles,
   Wand2,
@@ -22,7 +24,9 @@ import {
   Flame,
   Brain,
   Dumbbell,
-  Activity
+  Activity,
+  Calculator,
+  Share2
 } from "lucide-react";
 
 const homeWorkouts = [
@@ -118,6 +122,7 @@ export default function Workout() {
   const {
     isLoaded,
     profile,
+    xp,
     customWorkoutPlan,
     saveWorkoutPlan,
     addXp,
@@ -157,7 +162,7 @@ export default function Workout() {
   const [restTotalSeconds, setRestTotalSeconds] = useState<number>(90);
   const [isResting, setIsResting] = useState<boolean>(false);
 
-  // Completion Summary Modal
+  // Completion Summary Modal & Tactical Tools
   const [sessionSummary, setSessionSummary] = useState<{
     workoutName: string;
     totalVolumeKg: number;
@@ -165,6 +170,9 @@ export default function Workout() {
     prsCount: number;
     xpEarned: number;
   } | null>(null);
+  const [tacticalTarget, setTacticalTarget] = useState<{ exIdx: number; exercise: any; workingWeight: number } | null>(null);
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [swappedExercises, setSwappedExercises] = useState<Record<string, any>>({});
 
   useEffect(() => {
     if (!isGenerating) return;
@@ -216,6 +224,26 @@ export default function Workout() {
   }
 
   const contextPrefix = isCustomMode ? `c_${activeDayTab}` : `s_${fallbackLocation}_${fallbackRoutineIdx}`;
+  currentExercises = currentExercises.map((ex, idx) => swappedExercises[`${contextPrefix}_${idx}`] || ex);
+
+  const rankName = RANKS[Math.min(Math.floor(xp / 200), RANKS.length - 1)];
+
+  const handleSwapExercise = (exIdx: number, newExercise: any) => {
+    const key = `${contextPrefix}_${exIdx}`;
+    setSwappedExercises((prev) => ({ ...prev, [key]: newExercise }));
+    if (isCustomMode && customWorkoutPlan?.days?.[activeDayTab]) {
+      const updatedPlan = {
+        ...customWorkoutPlan,
+        days: customWorkoutPlan.days.map((d: any, dIdx: number) =>
+          dIdx === activeDayTab
+            ? { ...d, exercises: (d.exercises || []).map((ex: any, i: number) => (i === exIdx ? newExercise : ex)) }
+            : d
+        )
+      };
+      saveWorkoutPlan(updatedPlan);
+    }
+    showToast(`Ejercicio cambiado a ${newExercise.name}`, "success");
+  };
 
   const getSetsForExercise = (idx: number, exercise: any): SetRecord[] => {
     const key = `${contextPrefix}_${idx}`;
@@ -809,20 +837,42 @@ export default function Workout() {
                           {exercise.rest && <span style={{ color: "var(--text-muted)" }}>⏱️ {exercise.rest}</span>}
                         </div>
                       </div>
-                      <button
-                        onClick={() => completeAllSetsForExercise(exIdx, exercise)}
-                        style={{
-                          padding: "0.3rem 0.55rem",
-                          borderRadius: "8px",
-                          fontSize: "0.7rem",
-                          fontWeight: 700,
-                          background: exAllDone ? "var(--accent)" : "rgba(255,255,255,0.06)",
-                          color: exAllDone ? "#000" : "var(--text-muted)",
-                          whiteSpace: "nowrap"
-                        }}
-                      >
-                        {exAllDone ? "✓ Hecho" : "Marcar Todo"}
-                      </button>
+                      <div style={{ display: "flex", gap: "0.35rem", alignItems: "center" }}>
+                        <button
+                          onClick={() => {
+                            const maxW = Math.max(0, ...sets.map((s) => s.weight || 0));
+                            setTacticalTarget({ exIdx, exercise, workingWeight: maxW || 60 });
+                          }}
+                          style={{
+                            padding: "0.3rem 0.45rem",
+                            borderRadius: "8px",
+                            fontSize: "0.7rem",
+                            fontWeight: 700,
+                            background: "rgba(255,255,255,0.06)",
+                            color: "var(--accent)",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "0.2rem"
+                          }}
+                          title="Calculadora de discos, calentamiento y reemplazo"
+                        >
+                          <Calculator size={13} /> Discos/Swap
+                        </button>
+                        <button
+                          onClick={() => completeAllSetsForExercise(exIdx, exercise)}
+                          style={{
+                            padding: "0.3rem 0.55rem",
+                            borderRadius: "8px",
+                            fontSize: "0.7rem",
+                            fontWeight: 700,
+                            background: exAllDone ? "var(--accent)" : "rgba(255,255,255,0.06)",
+                            color: exAllDone ? "#000" : "var(--text-muted)",
+                            whiteSpace: "nowrap"
+                          }}
+                        >
+                          {exAllDone ? "✓ Hecho" : "Todo"}
+                        </button>
+                      </div>
                     </div>
 
                     {exercise.cue && (
@@ -1103,6 +1153,26 @@ export default function Workout() {
                   <span style={{ fontSize: "1.2rem", fontWeight: 800, color: "var(--primary)" }}>+{sessionSummary.xpEarned}</span>
                 </div>
               </div>
+
+              <button
+                onClick={() => setShowShareModal(true)}
+                style={{
+                  width: "100%",
+                  padding: "0.95rem",
+                  background: "var(--accent-subtle)",
+                  border: "1px solid var(--accent-border)",
+                  color: "var(--accent)",
+                  borderRadius: "14px",
+                  fontWeight: 800,
+                  fontSize: "0.94rem",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "0.45rem"
+                }}
+              >
+                <Share2 size={18} /> Crear Tarjeta Viral para Stories
+              </button>
 
               <button
                 onClick={() => {
@@ -1437,6 +1507,25 @@ export default function Workout() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Gym Tactical Modal (Olympic Plates, Warmups & Machine Swap) */}
+      <GymTacticalModal
+        isOpen={Boolean(tacticalTarget)}
+        onClose={() => setTacticalTarget(null)}
+        exercise={tacticalTarget?.exercise}
+        workingWeight={tacticalTarget?.workingWeight || 60}
+        onSwapExercise={(newEx) => {
+          if (tacticalTarget) handleSwapExercise(tacticalTarget.exIdx, newEx);
+        }}
+      />
+
+      {/* Viral Workout Story Card Modal */}
+      <ShareCardModal
+        isOpen={showShareModal}
+        onClose={() => setShowShareModal(false)}
+        summary={sessionSummary}
+        rankName={rankName}
+      />
     </motion.main>
   );
 }

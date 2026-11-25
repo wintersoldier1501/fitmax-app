@@ -4,16 +4,20 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect, useRef } from "react";
 import styles from "./log.module.css";
 import { useFitmax } from "@/context/FitmaxContext";
-import { Search, Loader2, Trash2, Mic, MicOff, Sparkles, Brain, Check, Plus, RotateCcw } from "lucide-react";
+import { Search, Loader2, Trash2, Mic, MicOff, Sparkles, Brain, Check, Plus, RotateCcw, Star, Repeat } from "lucide-react";
 import Link from "next/link";
 
 export default function DiaryLog() {
   const {
     isLoaded,
     loggedFoods,
+    favoriteMeals,
+    yesterdayFoods,
     resetProgress,
     addFoodLog,
     removeFoodLog,
+    toggleFavoriteMeal,
+    repeatYesterdayMeals,
     todayReadiness,
     saveReadinessLog,
     showToast
@@ -439,6 +443,68 @@ export default function DiaryLog() {
         </AnimatePresence>
       </section>
 
+      {/* 1-Tap Favorites & Repeat Yesterday */}
+      {(favoriteMeals.length > 0 || yesterdayFoods.length > 0) && (
+        <section className="glass-card" style={{ padding: "1rem 1.1rem", border: "1px solid var(--border)" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.65rem" }}>
+            <span style={{ fontSize: "0.82rem", fontWeight: 800, color: "white", display: "flex", alignItems: "center", gap: "0.35rem" }}>
+              <Star size={14} color="#F59E0B" /> Nutrición 1-Tap
+            </span>
+            {yesterdayFoods.length > 0 && (
+              <button
+                onClick={repeatYesterdayMeals}
+                style={{
+                  padding: "0.3rem 0.65rem",
+                  borderRadius: "8px",
+                  background: "var(--accent-subtle)",
+                  border: "1px solid var(--accent-border)",
+                  color: "var(--accent)",
+                  fontSize: "0.74rem",
+                  fontWeight: 700,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.3rem"
+                }}
+              >
+                <Repeat size={13} /> Repetir Ayer ({yesterdayFoods.length})
+              </button>
+            )}
+          </div>
+
+          {favoriteMeals.length > 0 && (
+            <div style={{ display: "flex", gap: "0.5rem", overflowX: "auto", paddingBottom: "0.2rem" }}>
+              {favoriteMeals.map((fav) => (
+                <button
+                  key={fav.id}
+                  onClick={() =>
+                    addFoodLog({
+                      id: Date.now().toString(),
+                      name: fav.name,
+                      macros: { ...fav.macros },
+                      time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+                    })
+                  }
+                  style={{
+                    flexShrink: 0,
+                    padding: "0.5rem 0.75rem",
+                    borderRadius: "10px",
+                    background: "var(--bg-dark)",
+                    border: "1px solid var(--border)",
+                    color: "white",
+                    textAlign: "left"
+                  }}
+                >
+                  <span style={{ display: "block", fontSize: "0.78rem", fontWeight: 700 }}>⭐ {fav.name}</span>
+                  <span style={{ fontSize: "0.68rem", color: "var(--primary)", fontWeight: 700 }}>
+                    +{fav.macros.protein}g P · {fav.macros.calories} kcal
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
+
       {/* Real Food Search */}
       <section>
         <div style={{ position: "relative", display: "flex", gap: "0.5rem" }}>
@@ -680,25 +746,53 @@ export default function DiaryLog() {
                       </button>
                     </div>
                   ) : (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setConfirmDeleteId(food.id);
-                      }}
-                      style={{
-                        background: "var(--primary-subtle)",
-                        border: "1px solid var(--primary-border)",
-                        color: "var(--primary)",
-                        borderRadius: "8px",
-                        padding: "0.35rem 0.55rem",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center"
-                      }}
-                      title="Eliminar comida"
-                    >
-                      <Trash2 size={15} />
-                    </button>
+                    <div style={{ display: "flex", gap: "0.35rem", alignItems: "center" }}>
+                      {(() => {
+                        const isFav = favoriteMeals.some(
+                          (f) => f.name.toLowerCase().trim() === food.name.toLowerCase().trim()
+                        );
+                        return (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleFavoriteMeal(food);
+                            }}
+                            style={{
+                              background: isFav ? "rgba(245, 158, 11, 0.16)" : "rgba(255,255,255,0.05)",
+                              border: isFav ? "1px solid rgba(245, 158, 11, 0.4)" : "1px solid var(--border)",
+                              color: isFav ? "#F59E0B" : "var(--text-muted)",
+                              borderRadius: "8px",
+                              padding: "0.35rem 0.5rem",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center"
+                            }}
+                            title="Guardar como comida favorita (1-Tap)"
+                          >
+                            <Star size={14} fill={isFav ? "#F59E0B" : "none"} />
+                          </button>
+                        );
+                      })()}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setConfirmDeleteId(food.id);
+                        }}
+                        style={{
+                          background: "var(--primary-subtle)",
+                          border: "1px solid var(--primary-border)",
+                          color: "var(--primary)",
+                          borderRadius: "8px",
+                          padding: "0.35rem 0.55rem",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center"
+                        }}
+                        title="Eliminar comida"
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    </div>
                   )}
                 </div>
 

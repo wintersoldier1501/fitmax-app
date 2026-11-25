@@ -6,7 +6,9 @@ import styles from "./dashboard.module.css";
 import { RankCard } from "@/components/RankCard";
 import { MacroRing } from "@/components/MacroRing";
 import { DailyWisdom } from "@/components/DailyWisdom";
-import { useFitmax, RANKS } from "@/context/FitmaxContext";
+import { HybridCardioWidget } from "@/components/HybridCardioWidget";
+import { PwaInstallBanner } from "@/components/PwaInstallBanner";
+import { useFitmax, RANKS, getLocalISODate, SupplementKey } from "@/context/FitmaxContext";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -20,7 +22,10 @@ import {
   Scale,
   Sparkles,
   Brain,
-  TrendingUp
+  TrendingUp,
+  Gift,
+  CheckCircle2,
+  Pill
 } from "lucide-react";
 
 export default function Dashboard() {
@@ -40,6 +45,14 @@ export default function Dashboard() {
     addXp,
     customWorkoutPlan,
     todayReadiness,
+    todaySupplements,
+    creatineStreak,
+    toggleSupplement,
+    dailySteps,
+    stepsGoal,
+    workoutHistory,
+    trifectaClaimedDate,
+    claimDailyTrifecta,
     showToast
   } = useFitmax();
   const router = useRouter();
@@ -113,6 +126,9 @@ export default function Dashboard() {
         </Link>
       </motion.header>
 
+      {/* PWA Install Guide Banner */}
+      <PwaInstallBanner />
+
       {/* Gamification Rank Card */}
       <section>
         <RankCard
@@ -124,6 +140,78 @@ export default function Dashboard() {
           streakShields={streakShields}
         />
       </section>
+
+      {/* Daily Trifecta Quests */}
+      {(() => {
+        const todayISO = getLocalISODate();
+        const proteinQuestDone = (targetMacros.protein || 100) > 0 && currentMacros.protein >= (targetMacros.protein || 100) * 0.85;
+        const hydrationQuestDone = waterGlasses >= 8;
+        const trainedToday = workoutHistory.some((w) => w.date === todayISO);
+        const movementQuestDone = trainedToday || dailySteps >= stepsGoal;
+        const completedCount = [proteinQuestDone, hydrationQuestDone, movementQuestDone].filter(Boolean).length;
+        const allDone = completedCount === 3;
+        const alreadyClaimed = trifectaClaimedDate === todayISO;
+
+        return (
+          <section className="glass-card" style={{ padding: "1.1rem", border: allDone ? "1px solid var(--accent-border)" : "1px solid var(--border)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.7rem" }}>
+              <span style={{ fontSize: "0.84rem", fontWeight: 800, color: "white", display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                <Gift size={16} color="var(--primary)" /> Trifecta Diaria ({completedCount}/3)
+              </span>
+              <span style={{ fontSize: "0.72rem", color: allDone ? "#10b981" : "var(--text-muted)", fontWeight: 700 }}>
+                {alreadyClaimed ? "✓ Cofre reclamado" : "+150 XP + 1 Escudo"}
+              </span>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "0.45rem" }}>
+              {[
+                { label: "85% Proteína", done: proteinQuestDone },
+                { label: "2L Agua (8💧)", done: hydrationQuestDone },
+                { label: "Entreno o 10k", done: movementQuestDone }
+              ].map((q, idx) => (
+                <div
+                  key={idx}
+                  style={{
+                    padding: "0.5rem 0.35rem",
+                    borderRadius: "10px",
+                    background: q.done ? "rgba(16, 185, 129, 0.12)" : "var(--bg-dark)",
+                    border: q.done ? "1px solid rgba(16, 185, 129, 0.35)" : "1px solid var(--border)",
+                    textAlign: "center",
+                    fontSize: "0.72rem",
+                    fontWeight: 700,
+                    color: q.done ? "#10b981" : "var(--text-muted)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "0.25rem"
+                  }}
+                >
+                  {q.done && <CheckCircle2 size={12} />} {q.label}
+                </div>
+              ))}
+            </div>
+
+            {allDone && !alreadyClaimed && (
+              <button
+                onClick={claimDailyTrifecta}
+                className="glow-primary"
+                style={{
+                  marginTop: "0.75rem",
+                  width: "100%",
+                  padding: "0.7rem",
+                  borderRadius: "10px",
+                  background: "var(--primary)",
+                  color: "white",
+                  fontWeight: 800,
+                  fontSize: "0.85rem"
+                }}
+              >
+                🎁 Abrir Cofre Trifecta (+150 XP + 🛡️ Escudo)
+              </button>
+            )}
+          </section>
+        );
+      })()}
 
       {/* Daily Wisdom & Stoic Reflection */}
       <motion.section
@@ -232,6 +320,61 @@ export default function Dashboard() {
           </span>
         </Link>
       </motion.section>
+
+      {/* Grade-A Daily Supplements Stack */}
+      <motion.section
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.45, delay: 0.28 }}
+      >
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.7rem" }}>
+          <h2 className={styles.sectionTitle} style={{ margin: 0, display: "flex", alignItems: "center", gap: "0.45rem" }}>
+            <Pill size={18} color="var(--primary)" /> Stack Diario
+          </h2>
+          <span style={{ fontSize: "0.74rem", fontWeight: 700, color: "var(--accent)", background: "var(--accent-subtle)", padding: "0.2rem 0.55rem", borderRadius: "999px" }}>
+            ⚡ Creatina: {creatineStreak} {creatineStreak === 1 ? "día" : "días"}
+          </span>
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.55rem" }}>
+          {[
+            { key: "creatine", label: "⚡ Creatina 5g", sub: "+15 XP diario" },
+            { key: "caffeine", label: "☕ Pre-Entreno", sub: "Foco neural" },
+            { key: "omega3", label: "🐟 Omega-3", sub: "Recuperación" },
+            { key: "electrolytes", label: "💧 Electrolitos", sub: "Sodio/Potasio" }
+          ].map((sup) => {
+            const active = todaySupplements[sup.key as SupplementKey];
+            return (
+              <button
+                key={sup.key}
+                onClick={() => toggleSupplement(sup.key as SupplementKey)}
+                className="glass-card"
+                style={{
+                  padding: "0.75rem 0.85rem",
+                  borderRadius: "14px",
+                  border: active ? "1px solid #10b981" : "1px solid var(--border)",
+                  background: active ? "rgba(16, 185, 129, 0.12)" : "var(--bg-surface)",
+                  textAlign: "left",
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center"
+                }}
+              >
+                <div>
+                  <span style={{ display: "block", fontSize: "0.82rem", fontWeight: 800, color: active ? "#10b981" : "white" }}>
+                    {sup.label}
+                  </span>
+                  <span style={{ fontSize: "0.68rem", color: "var(--text-muted)" }}>{sup.sub}</span>
+                </div>
+                <CheckCircle2 size={16} color={active ? "#10b981" : "rgba(255,255,255,0.18)"} />
+              </button>
+            );
+          })}
+        </div>
+      </motion.section>
+
+      {/* Hybrid Athlete Widget (Steps NEAT + Cardio Logger) */}
+      <HybridCardioWidget />
 
       {/* Water Hydration Tracker */}
       <motion.section
