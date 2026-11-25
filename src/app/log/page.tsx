@@ -4,7 +4,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect, useRef } from "react";
 import styles from "./log.module.css";
 import { useFitmax } from "@/context/FitmaxContext";
-import { Search, Loader2, Trash2, Mic, MicOff, Sparkles, Brain, Check, Plus, RotateCcw, Star, Repeat } from "lucide-react";
+import { RestaurantInfiltratorModal } from "@/components/RestaurantInfiltratorModal";
+import { Search, Loader2, Trash2, Mic, MicOff, Sparkles, Brain, Check, Plus, RotateCcw, Star, Repeat, Utensils, Shield } from "lucide-react";
 import Link from "next/link";
 
 export default function DiaryLog() {
@@ -19,9 +20,13 @@ export default function DiaryLog() {
     toggleFavoriteMeal,
     repeatYesterdayMeals,
     todayReadiness,
+    todaySocialBank,
     saveReadinessLog,
     showToast
   } = useFitmax();
+
+  const [infiltratorOpen, setInfiltratorOpen] = useState(false);
+  const [infiltratorTab, setInfiltratorTab] = useState<"scanner" | "banking">("scanner");
 
   // Food Search State
   const [searchQuery, setSearchQuery] = useState("");
@@ -322,6 +327,60 @@ export default function DiaryLog() {
           )
         )}
       </header>
+
+      {/* Quick Restaurant Infiltrator & Social Banking Strip */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.55rem" }}>
+        <button
+          onClick={() => {
+            setInfiltratorTab("scanner");
+            setInfiltratorOpen(true);
+          }}
+          className="glass-card"
+          style={{
+            padding: "0.7rem 0.75rem",
+            borderRadius: "14px",
+            border: "1px solid var(--accent-border)",
+            background: "rgba(0, 229, 255, 0.08)",
+            color: "white",
+            fontSize: "0.76rem",
+            fontWeight: 800,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: "0.4rem"
+          }}
+        >
+          <Utensils size={14} color="var(--accent)" /> Comer en Restaurante
+        </button>
+
+        <button
+          onClick={() => {
+            setInfiltratorTab("banking");
+            setInfiltratorOpen(true);
+          }}
+          className="glass-card"
+          style={{
+            padding: "0.7rem 0.75rem",
+            borderRadius: "14px",
+            border: todaySocialBank?.active ? "1px solid #F59E0B" : "1px solid rgba(245, 158, 11, 0.3)",
+            background: todaySocialBank?.active ? "rgba(245, 158, 11, 0.16)" : "rgba(245, 158, 11, 0.06)",
+            color: "#FBBF24",
+            fontSize: "0.76rem",
+            fontWeight: 800,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: "0.4rem"
+          }}
+        >
+          <Shield size={14} />
+          {todaySocialBank?.active
+            ? todaySocialBank.released
+              ? "Evento Activo"
+              : `Blindadas ${todaySocialBank.reservedCalories} kcal`
+            : "Escudo Evento Social"}
+        </button>
+      </div>
 
       {/* Magic Natural Language & Voice Meal Logger */}
       <section
@@ -927,6 +986,12 @@ export default function DiaryLog() {
           </div>
         )}
       </AnimatePresence>
+
+      <RestaurantInfiltratorModal
+        isOpen={infiltratorOpen}
+        onClose={() => setInfiltratorOpen(false)}
+        initialTab={infiltratorTab}
+      />
     </motion.main>
   );
 }

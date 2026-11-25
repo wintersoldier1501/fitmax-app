@@ -4,9 +4,10 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import styles from "./diet.module.css";
 import { useFitmax } from "@/context/FitmaxContext";
+import { RestaurantInfiltratorModal } from "@/components/RestaurantInfiltratorModal";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Bot, Wand2, ChefHat, ShoppingCart, Sparkles, X, Clock, Plus, Check, Loader2, Utensils } from "lucide-react";
+import { Bot, Wand2, ChefHat, ShoppingCart, Sparkles, X, Clock, Plus, Check, Loader2, Utensils, Shield } from "lucide-react";
 
 const quickTags = [
   "🥚 Huevos", "🍗 Pollo", "🐟 Atún", "🍚 Arroz",
@@ -15,8 +16,12 @@ const quickTags = [
 ];
 
 export default function DietCenter() {
-  const { isLoaded, customDiet, currentMacros, targetMacros, profile, addFoodLog, showToast } = useFitmax();
+  const { isLoaded, customDiet, currentMacros, targetMacros, profile, todaySocialBank, addFoodLog, showToast } = useFitmax();
   const router = useRouter();
+
+  // Infiltrator Modal State
+  const [infiltratorOpen, setInfiltratorOpen] = useState(false);
+  const [infiltratorTab, setInfiltratorTab] = useState<"scanner" | "banking">("scanner");
 
   // Chef IA State
   const [showChefModal, setShowChefModal] = useState(false);
@@ -268,6 +273,116 @@ export default function DietCenter() {
           }}
         >
           <Sparkles size={14} /> Abrir
+        </div>
+      </motion.div>
+
+      {/* Restaurant Infiltrator & Social Calorie Banking Hero */}
+      <motion.div
+        whileHover={{ scale: 1.01 }}
+        className="glass-card"
+        style={{
+          background: "linear-gradient(135deg, rgba(245, 158, 11, 0.14), rgba(0, 229, 255, 0.08))",
+          border: "1px solid rgba(245, 158, 11, 0.35)",
+          padding: "1.1rem",
+          borderRadius: "18px",
+          display: "flex",
+          flexDirection: "column",
+          gap: "0.75rem",
+          boxShadow: "0 8px 24px rgba(0, 0, 0, 0.25)"
+        }}
+      >
+        <div
+          onClick={() => {
+            setInfiltratorTab("scanner");
+            setInfiltratorOpen(true);
+          }}
+          style={{ display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer" }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: "0.85rem" }}>
+            <div
+              style={{
+                width: "46px",
+                height: "46px",
+                borderRadius: "14px",
+                background: "linear-gradient(135deg, #F59E0B, var(--primary))",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: "1.5rem"
+              }}
+            >
+              🕵️‍♂️
+            </div>
+            <div>
+              <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", flexWrap: "wrap" }}>
+                <h3 style={{ margin: 0, color: "white", fontSize: "1.02rem", fontFamily: "var(--font-display)" }}>
+                  Infiltrador de Restaurantes
+                </h3>
+                <span
+                  style={{
+                    fontSize: "0.64rem",
+                    background: "rgba(245, 158, 11, 0.2)",
+                    color: "#FBBF24",
+                    border: "1px solid rgba(245, 158, 11, 0.4)",
+                    padding: "0.14rem 0.4rem",
+                    borderRadius: "6px",
+                    fontWeight: 800
+                  }}
+                >
+                  IA VISIÓN
+                </span>
+              </div>
+              <p style={{ margin: 0, color: "var(--text-muted)", fontSize: "0.78rem", marginTop: "0.15rem" }}>
+                {todaySocialBank?.active
+                  ? `🛡️ Escudo activo: ${todaySocialBank.reservedCalories} kcal (${todaySocialBank.eventName})`
+                  : "Fotografía la carta y recibe órdenes exactas para el mesero"}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.5rem" }}>
+          <button
+            onClick={() => {
+              setInfiltratorTab("scanner");
+              setInfiltratorOpen(true);
+            }}
+            style={{
+              padding: "0.55rem 0.6rem",
+              borderRadius: "10px",
+              background: "var(--primary)",
+              color: "white",
+              fontSize: "0.78rem",
+              fontWeight: 800,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "0.35rem"
+            }}
+          >
+            <Utensils size={14} /> Escanear Menú
+          </button>
+          <button
+            onClick={() => {
+              setInfiltratorTab("banking");
+              setInfiltratorOpen(true);
+            }}
+            style={{
+              padding: "0.55rem 0.6rem",
+              borderRadius: "10px",
+              background: todaySocialBank?.active ? "rgba(245, 158, 11, 0.22)" : "rgba(255,255,255,0.06)",
+              border: todaySocialBank?.active ? "1px solid #F59E0B" : "1px solid var(--border)",
+              color: todaySocialBank?.active ? "#FBBF24" : "white",
+              fontSize: "0.78rem",
+              fontWeight: 800,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "0.35rem"
+            }}
+          >
+            <Shield size={14} /> {todaySocialBank?.active ? "Ver Escudo" : "Escudo Social"}
+          </button>
         </div>
       </motion.div>
 
@@ -667,6 +782,12 @@ export default function DietCenter() {
           </div>
         )}
       </AnimatePresence>
+
+      <RestaurantInfiltratorModal
+        isOpen={infiltratorOpen}
+        onClose={() => setInfiltratorOpen(false)}
+        initialTab={infiltratorTab}
+      />
     </motion.main>
   );
 }

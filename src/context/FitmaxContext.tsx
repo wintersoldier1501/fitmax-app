@@ -118,6 +118,14 @@ export interface SupplementState {
 
 export type SupplementKey = "creatine" | "caffeine" | "omega3" | "electrolytes";
 
+export interface SocialCalorieBank {
+  date: string; // YYYY-MM-DD (valid only for today)
+  active: boolean;
+  reservedCalories: number;
+  eventName: string;
+  released: boolean; // false = banked during daytime; true = unlocked for event
+}
+
 export interface CardioSessionLog {
   id: string;
   date: string;
@@ -167,6 +175,7 @@ interface FitmaxState {
   exercisePRs: Record<string, ExercisePR>;
   todayReadiness: ReadinessLog | null;
   todaySupplements: SupplementState;
+  todaySocialBank: SocialCalorieBank | null;
   creatineStreak: number;
   dailySteps: number;
   stepsGoal: number;
@@ -199,6 +208,9 @@ interface FitmaxState {
   getLastExercisePerformance: (exerciseName: string) => SetRecord[] | null;
   saveReadinessLog: (data: Omit<ReadinessLog, "date" | "score">) => void;
   toggleSupplement: (key: SupplementKey) => void;
+  activateSocialBank: (reservedCalories: number, eventName?: string) => void;
+  releaseSocialBank: () => void;
+  cancelSocialBank: () => void;
   updateDailySteps: (steps: number) => void;
   logCardioSession: (session: Omit<CardioSessionLog, "id" | "date">) => void;
   claimDailyTrifecta: () => void;
@@ -333,6 +345,8 @@ export const FitmaxProvider = ({ children }: { children: ReactNode }) => {
   const [todayReadiness, setTodayReadiness] = useState<ReadinessLog | null>(null);
 
   const [todaySupplements, setTodaySupplements] = useState<SupplementState>(() => defaultSupplements(getLocalISODate()));
+  const [todaySocialBank, setTodaySocialBank] = useState<SocialCalorieBank | null>(null);
+  const [socialXpDate, setSocialXpDate] = useState("");
   const [creatineStreak, setCreatineStreak] = useState(0);
   const [lastCreatineDate, setLastCreatineDate] = useState("");
   const [dailySteps, setDailySteps] = useState(0);
@@ -393,6 +407,8 @@ export const FitmaxProvider = ({ children }: { children: ReactNode }) => {
     const savedReadiness = safeParse<ReadinessLog | null>(localStorage.getItem("fitmax_todayReadiness"), null);
 
     const savedSupps = safeParse<SupplementState>(localStorage.getItem("fitmax_todaySupplements"), defaultSupplements(todayISO));
+    const savedSocialBank = safeParse<SocialCalorieBank | null>(localStorage.getItem("fitmax_socialBank"), null);
+    const savedSocialXpDate = localStorage.getItem("fitmax_socialXpDate") || "";
     const savedCreatineStreak = Number(localStorage.getItem("fitmax_creatineStreak") || 0);
     const savedLastCreatineDate = localStorage.getItem("fitmax_lastCreatineDate") || "";
     const savedSteps = Number(localStorage.getItem("fitmax_dailySteps") || 0);
@@ -414,6 +430,7 @@ export const FitmaxProvider = ({ children }: { children: ReactNode }) => {
     setWeightHistory(savedWeightHistory);
     setWorkoutHistory(savedWorkoutHistory);
     setExercisePRs(savedExercisePRs);
+    setSocialXpDate(savedSocialXpDate);
     setCreatineStreak(isNaN(savedCreatineStreak) ? 0 : savedCreatineStreak);
     setLastCreatineDate(savedLastCreatineDate);
     setStepsXpDate(savedStepsXpDate);
@@ -461,10 +478,12 @@ export const FitmaxProvider = ({ children }: { children: ReactNode }) => {
       setDailySteps(0);
       setTodayReadiness(null);
       setTodaySupplements(defaultSupplements(todayISO));
+      setTodaySocialBank(null);
       setLastResetDate(todayStr);
       localStorage.removeItem("fitmax_water");
       localStorage.removeItem("fitmax_dailySteps");
       localStorage.removeItem("fitmax_todayReadiness");
+      localStorage.removeItem("fitmax_socialBank");
     } else {
       setCurrentMacros(savedCurrent);
       setLoggedFoods(savedLogs);
@@ -478,6 +497,9 @@ export const FitmaxProvider = ({ children }: { children: ReactNode }) => {
         setTodaySupplements(savedSupps);
       } else {
         setTodaySupplements(defaultSupplements(todayISO));
+      }
+      if (savedSocialBank && savedSocialBank.date === todayISO) {
+        setTodaySocialBank(savedSocialBank);
       }
     }
 
@@ -522,6 +544,7 @@ export const FitmaxProvider = ({ children }: { children: ReactNode }) => {
             if (data.exercisePRs) setExercisePRs(data.exercisePRs);
             if (data.todayReadiness && data.todayReadiness.date === todayISO) setTodayReadiness(data.todayReadiness);
             if (data.todaySupplements && data.todaySupplements.date === todayISO) setTodaySupplements(data.todaySupplements);
+            if (data.todaySocialBank && data.todaySocialBank.date === todayISO) setTodaySocialBank(data.todaySocialBank);
             if (data.lastResetDate) setLastResetDate(data.lastResetDate);
             if (data.activeTheme) {
               setActiveTheme(data.activeTheme);
@@ -585,6 +608,12 @@ export const FitmaxProvider = ({ children }: { children: ReactNode }) => {
       localStorage.setItem("fitmax_dailySteps", dailySteps.toString());
       localStorage.setItem("fitmax_stepsXpDate", stepsXpDate);
       localStorage.setItem("fitmax_todaySupplements", JSON.stringify(todaySupplements));
+      localStorage.setItem("fitmax_socialXpDate", socialXpDate);
+      if (todaySocialBank) {
+        localStorage.setItem("fitmax_socialBank", JSON.stringify(todaySocialBank));
+      } else {
+        localStorage.removeItem("fitmax_socialBank");
+      }
       localStorage.setItem("fitmax_creatineStreak", creatineStreak.toString());
       localStorage.setItem("fitmax_lastCreatineDate", lastCreatineDate);
       localStorage.setItem("fitmax_cardioHistory", JSON.stringify(cardioHistory.slice(0, 40)));
@@ -617,6 +646,7 @@ export const FitmaxProvider = ({ children }: { children: ReactNode }) => {
             waterGlasses,
             dailySteps,
             todaySupplements,
+            todaySocialBank,
             creatineStreak,
             lastCreatineDate,
             cardioHistory: cardioHistory.slice(0, 30),
@@ -653,6 +683,8 @@ export const FitmaxProvider = ({ children }: { children: ReactNode }) => {
     dailySteps,
     stepsXpDate,
     todaySupplements,
+    todaySocialBank,
+    socialXpDate,
     creatineStreak,
     lastCreatineDate,
     cardioHistory,
@@ -1024,6 +1056,38 @@ export const FitmaxProvider = ({ children }: { children: ReactNode }) => {
     });
   };
 
+  const activateSocialBank = (reservedCalories: number, eventName = "Cena / Evento Social") => {
+    const todayISO = getLocalISODate();
+    const cleanReserve = Math.max(300, Math.min(1800, Math.round(reservedCalories)));
+    setTodaySocialBank({
+      date: todayISO,
+      active: true,
+      reservedCalories: cleanReserve,
+      eventName: eventName.trim() || "Cena / Evento Social",
+      released: false
+    });
+    if (socialXpDate !== todayISO) {
+      setSocialXpDate(todayISO);
+      addXp(25, "Escudo Social activado 🛡️");
+    } else {
+      showToast(`🛡️ ${cleanReserve} kcal blindadas para hoy`, "success");
+    }
+  };
+
+  const releaseSocialBank = () => {
+    const todayISO = getLocalISODate();
+    setTodaySocialBank((prev) =>
+      prev && prev.date === todayISO ? { ...prev, released: true } : prev
+    );
+    showToast("🥂 ¡Colchón liberado! Usa el Escáner de Menú para pedir con maestría", "success");
+  };
+
+  const cancelSocialBank = () => {
+    setTodaySocialBank(null);
+    localStorage.removeItem("fitmax_socialBank");
+    showToast("Reserva social desactivada", "warning");
+  };
+
   const updateDailySteps = (steps: number) => {
     const cleanSteps = Math.max(0, Math.round(steps));
     const todayISO = getLocalISODate();
@@ -1106,6 +1170,7 @@ export const FitmaxProvider = ({ children }: { children: ReactNode }) => {
         exercisePRs,
         todayReadiness,
         todaySupplements,
+        todaySocialBank,
         creatineStreak,
         dailySteps,
         stepsGoal,
@@ -1138,6 +1203,9 @@ export const FitmaxProvider = ({ children }: { children: ReactNode }) => {
         getLastExercisePerformance,
         saveReadinessLog,
         toggleSupplement,
+        activateSocialBank,
+        releaseSocialBank,
+        cancelSocialBank,
         updateDailySteps,
         logCardioSession,
         claimDailyTrifecta,

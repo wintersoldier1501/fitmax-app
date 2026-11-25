@@ -6,6 +6,7 @@ import styles from "./profile.module.css";
 import { useFitmax } from "@/context/FitmaxContext";
 import { ProgressCharts } from "@/components/ProgressCharts";
 import { MuscleMap } from "@/components/MuscleMap";
+import { BioTimeMachine } from "@/components/BioTimeMachine";
 import { PhysiqueVault } from "@/components/PhysiqueVault";
 import { TrophyVault } from "@/components/TrophyVault";
 import { NotificationSettingsCard } from "@/components/PwaInstallBanner";
@@ -232,6 +233,7 @@ export default function Profile() {
 
       {tab === "analytics" ? (
         <div style={{ display: "flex", flexDirection: "column", gap: "1.2rem" }}>
+          <BioTimeMachine />
           <ProgressCharts />
           <MuscleMap />
         </div>

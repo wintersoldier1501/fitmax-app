@@ -8,6 +8,7 @@ import { MacroRing } from "@/components/MacroRing";
 import { DailyWisdom } from "@/components/DailyWisdom";
 import { HybridCardioWidget } from "@/components/HybridCardioWidget";
 import { PwaInstallBanner } from "@/components/PwaInstallBanner";
+import { RestaurantInfiltratorModal } from "@/components/RestaurantInfiltratorModal";
 import { useFitmax, RANKS, getLocalISODate, SupplementKey } from "@/context/FitmaxContext";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -25,7 +26,10 @@ import {
   TrendingUp,
   Gift,
   CheckCircle2,
-  Pill
+  Pill,
+  Clock,
+  Shield,
+  Utensils
 } from "lucide-react";
 
 export default function Dashboard() {
@@ -46,6 +50,9 @@ export default function Dashboard() {
     customWorkoutPlan,
     todayReadiness,
     todaySupplements,
+    todaySocialBank,
+    releaseSocialBank,
+    biometrics,
     creatineStreak,
     toggleSupplement,
     dailySteps,
@@ -56,6 +63,10 @@ export default function Dashboard() {
     showToast
   } = useFitmax();
   const router = useRouter();
+
+  // Restaurant Infiltrator Modal state
+  const [infiltratorOpen, setInfiltratorOpen] = useState(false);
+  const [infiltratorTab, setInfiltratorTab] = useState<"scanner" | "banking">("scanner");
 
   // Check-in modal state
   const [showCheckIn, setShowCheckIn] = useState(false);
@@ -89,8 +100,21 @@ export default function Dashboard() {
     targetMacros.calories ||
     Math.round(macros.protein.target * 4 + macros.carbs.target * 4 + macros.fats.target * 9);
   const consumedCal = currentMacros.calories || 0;
-  const remainingCal = Math.max(0, targetCalBudget - consumedCal);
-  const calPercent = Math.min(100, Math.round((consumedCal / Math.max(1, targetCalBudget)) * 100));
+  const lockedSocialCal = todaySocialBank?.active && !todaySocialBank.released ? todaySocialBank.reservedCalories : 0;
+  const remainingCal = Math.max(0, targetCalBudget - consumedCal - lockedSocialCal);
+  const calPercent = Math.min(100, Math.round((consumedCal / Math.max(1, targetCalBudget - lockedSocialCal)) * 100));
+
+  // Quick 90D Bio-Time Machine Preview
+  const isFemale = profile.sex === "M";
+  const nowWeight = profile.weight > 0 ? profile.weight : isFemale ? 62 : 76;
+  const nowHeight = profile.height > 0 ? profile.height : isFemale ? 162 : 175;
+  const bmrPreview = biometrics.leanMass
+    ? 370 + 21.6 * biometrics.leanMass
+    : 10 * nowWeight + 6.25 * nowHeight - 5 * (profile.age || 26) + (isFemale ? -161 : 5);
+  const multMap: Record<string, number> = { Sedentario: 1.2, Ligero: 1.375, Moderado: 1.55, Intenso: 1.725 };
+  const tdeePreview = bmrPreview * (multMap[profile.activityLevel || ""] || 1.375);
+  const plannedDelta = (targetMacros.calories > 800 ? targetMacros.calories : tdeePreview) - tdeePreview;
+  const projected90Weight = Math.round((nowWeight + (plannedDelta * 90) / 7700) * 10) / 10;
 
   return (
     <main className={styles.main}>
@@ -273,11 +297,115 @@ export default function Dashboard() {
               style={{
                 width: `${calPercent}%`,
                 height: "100%",
-                background: consumedCal > targetCalBudget ? "#EF4444" : "linear-gradient(90deg, var(--primary), var(--accent))",
+                background: consumedCal > Math.max(1, targetCalBudget - lockedSocialCal) ? "#EF4444" : "linear-gradient(90deg, var(--primary), var(--accent))",
                 transition: "width 0.4s ease"
               }}
             />
           </div>
+
+          {todaySocialBank?.active ? (
+            <div
+              style={{
+                marginTop: "0.35rem",
+                padding: "0.55rem 0.7rem",
+                borderRadius: "10px",
+                background: "rgba(245, 158, 11, 0.1)",
+                border: "1px solid rgba(245, 158, 11, 0.3)",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                gap: "0.5rem",
+                flexWrap: "wrap"
+              }}
+            >
+              <span style={{ fontSize: "0.73rem", color: "#FBBF24", fontWeight: 700 }}>
+                {todaySocialBank.released
+                  ? `🥂 Colchón de ${todaySocialBank.reservedCalories} kcal liberado (${todaySocialBank.eventName})`
+                  : `🛡️ ${todaySocialBank.reservedCalories} kcal reservadas (${todaySocialBank.eventName})`}
+              </span>
+              <div style={{ display: "flex", gap: "0.35rem" }}>
+                {!todaySocialBank.released && (
+                  <button
+                    onClick={releaseSocialBank}
+                    style={{
+                      padding: "0.26rem 0.55rem",
+                      borderRadius: "7px",
+                      background: "rgba(16, 185, 129, 0.2)",
+                      border: "1px solid rgba(16, 185, 129, 0.45)",
+                      color: "#10b981",
+                      fontSize: "0.7rem",
+                      fontWeight: 800
+                    }}
+                  >
+                    🥂 Liberar
+                  </button>
+                )}
+                <button
+                  onClick={() => {
+                    setInfiltratorTab("scanner");
+                    setInfiltratorOpen(true);
+                  }}
+                  style={{
+                    padding: "0.26rem 0.55rem",
+                    borderRadius: "7px",
+                    background: "var(--primary)",
+                    color: "white",
+                    fontSize: "0.7rem",
+                    fontWeight: 800
+                  }}
+                >
+                  🍽️ Escáner
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div style={{ display: "flex", gap: "0.45rem", marginTop: "0.25rem" }}>
+              <button
+                onClick={() => {
+                  setInfiltratorTab("scanner");
+                  setInfiltratorOpen(true);
+                }}
+                style={{
+                  flex: 1,
+                  padding: "0.44rem 0.5rem",
+                  borderRadius: "9px",
+                  background: "rgba(255,255,255,0.04)",
+                  border: "1px solid var(--border)",
+                  color: "var(--text-muted)",
+                  fontSize: "0.71rem",
+                  fontWeight: 700,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "0.3rem"
+                }}
+              >
+                <Utensils size={12} color="var(--accent)" /> ¿Comes fuera hoy?
+              </button>
+              <button
+                onClick={() => {
+                  setInfiltratorTab("banking");
+                  setInfiltratorOpen(true);
+                }}
+                style={{
+                  flex: 1,
+                  padding: "0.44rem 0.5rem",
+                  borderRadius: "9px",
+                  background: "rgba(245, 158, 11, 0.08)",
+                  border: "1px solid rgba(245, 158, 11, 0.28)",
+                  color: "#FBBF24",
+                  fontSize: "0.71rem",
+                  fontWeight: 700,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "0.3rem"
+                }}
+              >
+                <Shield size={12} /> Blindar Cena/Fiesta
+              </button>
+            </div>
+          )}
         </div>
       </motion.section>
 
@@ -318,6 +446,58 @@ export default function Dashboard() {
           <span style={{ fontSize: "0.72rem", color: "var(--text-muted)" }}>
             Mapa muscular y tendencias
           </span>
+        </Link>
+      </motion.section>
+
+      {/* Bio-Predictive 90D Time Machine Shortcut */}
+      <motion.section
+        initial={{ opacity: 0, y: 14 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.45, delay: 0.27 }}
+      >
+        <Link
+          href="/profile"
+          className="glass-card"
+          style={{
+            padding: "0.95rem 1.1rem",
+            border: "1px solid var(--accent-border)",
+            background: "linear-gradient(135deg, rgba(0, 229, 255, 0.08), rgba(20, 20, 28, 0.85))",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            gap: "0.75rem",
+            textDecoration: "none"
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+            <div
+              style={{
+                width: "40px",
+                height: "40px",
+                borderRadius: "12px",
+                background: "var(--accent-subtle)",
+                border: "1px solid var(--accent-border)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                color: "var(--accent)"
+              }}
+            >
+              <Clock size={20} />
+            </div>
+            <div>
+              <span style={{ fontSize: "0.7rem", color: "var(--accent)", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.5px", display: "block" }}>
+                Máquina del Tiempo (90 Días)
+              </span>
+              <span style={{ fontSize: "0.96rem", fontWeight: 800, color: "white" }}>
+                Gemelo Futuro: {nowWeight} kg → <span style={{ color: "var(--accent)" }}>{projected90Weight} kg</span>
+              </span>
+              <span style={{ display: "block", fontSize: "0.72rem", color: "var(--text-muted)" }}>
+                Simula tu curva Alfa vs. sabotaje de fin de semana
+              </span>
+            </div>
+          </div>
+          <ChevronRight size={20} color="var(--accent)" />
         </Link>
       </motion.section>
 
@@ -764,6 +944,12 @@ export default function Dashboard() {
           </div>
         )}
       </AnimatePresence>
+
+      <RestaurantInfiltratorModal
+        isOpen={infiltratorOpen}
+        onClose={() => setInfiltratorOpen(false)}
+        initialTab={infiltratorTab}
+      />
     </main>
   );
 }
