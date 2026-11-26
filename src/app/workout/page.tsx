@@ -253,9 +253,7 @@ export default function Workout() {
     return () => clearTimeout(t);
   }, [isResting, restSecondsLeft, showToast]);
 
-  if (!isLoaded) return null;
-
-  const hasActivePlan = customWorkoutPlan && customWorkoutPlan.days && customWorkoutPlan.days.length > 0;
+  const hasActivePlan = Boolean(customWorkoutPlan && customWorkoutPlan.days && customWorkoutPlan.days.length > 0);
   const isCustomMode = hasActivePlan && !viewStandardFallback;
 
   let currentWorkoutTitle = "";
@@ -263,28 +261,26 @@ export default function Workout() {
   let currentTargetMuscles = "";
   let currentExercises: any[] = [];
 
-  if (isCustomMode) {
-    const day = customWorkoutPlan.days[activeDayTab] || customWorkoutPlan.days[0];
-    currentWorkoutTitle = day.dayName || `Día ${day.dayNumber}`;
-    currentWorkoutDuration = day.duration || "50-60 min";
-    currentTargetMuscles = day.targetMuscles || "Grupo Muscular Principal";
-    currentExercises = day.exercises || [];
-  } else {
-    const list = fallbackLocation === "home" ? homeWorkouts : gymWorkouts;
-    const standard = list[fallbackRoutineIdx] || list[0];
-    currentWorkoutTitle = standard.name;
-    currentWorkoutDuration = standard.duration;
-    currentTargetMuscles = standard.targetMuscles;
-    currentExercises = standard.exercises;
+  if (isLoaded) {
+    if (isCustomMode) {
+      const day = customWorkoutPlan.days[activeDayTab] || customWorkoutPlan.days[0];
+      currentWorkoutTitle = day.dayName || `Día ${day.dayNumber}`;
+      currentWorkoutDuration = day.duration || "50-60 min";
+      currentTargetMuscles = day.targetMuscles || "Grupo Muscular Principal";
+      currentExercises = day.exercises || [];
+    } else {
+      const list = fallbackLocation === "home" ? homeWorkouts : gymWorkouts;
+      const standard = list[fallbackRoutineIdx] || list[0];
+      currentWorkoutTitle = standard.name;
+      currentWorkoutDuration = standard.duration;
+      currentTargetMuscles = standard.targetMuscles;
+      currentExercises = standard.exercises;
+    }
   }
 
-  const contextPrefix = isCustomMode ? `c_${activeDayTab}` : `s_${fallbackLocation}_${fallbackRoutineIdx}`;
-  const baseExercises = currentExercises.map((ex, idx) => swappedExercises[`${contextPrefix}_${idx}`] || ex);
-  currentExercises = [...baseExercises, ...(extraExercisesMap[contextPrefix] || [])];
-
-  // Persist live workout draft whenever sets or extra exercises change
+  // Persist live workout draft whenever sets or extra exercises change (MUST stay above early return)
   useEffect(() => {
-    if (!draftLoadedRef.current || typeof window === "undefined") return;
+    if (!isLoaded || !draftLoadedRef.current || typeof window === "undefined") return;
     const completedCount = Object.values(exerciseSetsMap).reduce(
       (acc, list) => acc + list.filter((s) => s.completed).length,
       0
@@ -314,6 +310,7 @@ export default function Workout() {
       }
     }
   }, [
+    isLoaded,
     exerciseSetsMap,
     swappedExercises,
     extraExercisesMap,
@@ -324,6 +321,12 @@ export default function Workout() {
     deloadMode,
     currentWorkoutTitle
   ]);
+
+  if (!isLoaded) return null;
+
+  const contextPrefix = isCustomMode ? `c_${activeDayTab}` : `s_${fallbackLocation}_${fallbackRoutineIdx}`;
+  const baseExercises = currentExercises.map((ex, idx) => swappedExercises[`${contextPrefix}_${idx}`] || ex);
+  currentExercises = [...baseExercises, ...(extraExercisesMap[contextPrefix] || [])];
 
   const rankName = RANKS[Math.min(Math.floor(xp / 200), RANKS.length - 1)];
 
