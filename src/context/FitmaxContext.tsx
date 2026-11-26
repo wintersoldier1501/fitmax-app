@@ -88,6 +88,7 @@ export interface ExerciseSessionRecord {
   muscle: string;
   sets: SetRecord[];
   best1RM: number;
+  baseBodyweightKg?: number;
 }
 
 export interface WorkoutSessionLog {
@@ -1013,21 +1014,25 @@ export const FitmaxProvider = ({ children }: { children: ReactNode }) => {
       setExercisePRs((prev) => {
         const next = { ...prev };
         for (const ex of session.exercises) {
-          const completedSets = ex.sets.filter((s) => s.completed && s.weight > 0 && s.reps > 0);
+          const baseBw = ex.baseBodyweightKg || 0;
+          const completedSets = ex.sets.filter((s) => s.completed && baseBw + s.weight > 0 && s.reps > 0);
           if (completedSets.length === 0) continue;
           let topSet = completedSets[0];
-          let top1RM = topSet.weight * (1 + topSet.reps / 30);
+          let topLoad = baseBw + topSet.weight;
+          let top1RM = topLoad * (1 + topSet.reps / 30);
           for (const s of completedSets) {
-            const est = s.weight * (1 + s.reps / 30);
+            const load = baseBw + s.weight;
+            const est = load * (1 + s.reps / 30);
             if (est > top1RM) {
               top1RM = est;
+              topLoad = load;
               topSet = s;
             }
           }
           const existing = next[ex.name];
           if (!existing || top1RM > existing.best1RM) {
             next[ex.name] = {
-              weight: topSet.weight,
+              weight: Math.round(topLoad * 10) / 10,
               reps: topSet.reps,
               best1RM: Math.round(top1RM * 10) / 10,
               date: todayISO

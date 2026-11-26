@@ -97,6 +97,19 @@ function parseRestSeconds(restText?: string): number {
   return Math.round(val);
 }
 
+function getBodyweightFactor(name?: string): number {
+  const n = (name || "").toLowerCase();
+  if (!n) return 0;
+  if (/(barra|mancuerna|polea|máquina|maquina|prensa|smith|hack|disco|kettlebell|pesa|extensión|extension|curl)/.test(n) && !n.includes("dominada")) {
+    return 0;
+  }
+  if (/(dominada|pull-up|chin-up|muscle-up|fondos en paralelas|dips|pistol)/.test(n)) return 1.0;
+  if (/(flexiones declinadas|pike|fondos en silla|remos invertidos|australian)/.test(n)) return 0.75;
+  if (/(flexion|flexión|push-up|lagartija|burpee|puente de glúteo|puente de gluteo|sentadilla|zancada)/.test(n)) return 0.65;
+  if (/(plancha|superman|hollow|abdominal|crunch|elevación de piernas|elevacion de piernas)/.test(n)) return 0.5;
+  return 0;
+}
+
 function playTimerChime() {
   try {
     const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
@@ -180,6 +193,7 @@ export default function Workout() {
   const [showShareModal, setShowShareModal] = useState(false);
   const [swappedExercises, setSwappedExercises] = useState<Record<string, any>>({});
   const [extraExercisesMap, setExtraExercisesMap] = useState<Record<string, any[]>>({});
+  const [bwOverrideMap, setBwOverrideMap] = useState<Record<string, boolean>>({});
   const [deloadMode, setDeloadMode] = useState(false);
   const [showAddExercise, setShowAddExercise] = useState(false);
   const [extraName, setExtraName] = useState("");
@@ -361,15 +375,26 @@ export default function Workout() {
     setExerciseSetsMap((prev) => ({ ...prev, [key]: current }));
   };
 
+  const getExerciseBwInfo = (exIdx: number, exercise: any) => {
+    const key = `${contextPrefix}_${exIdx}`;
+    const autoFactor = getBodyweightFactor(exercise?.name);
+    const isBodyweight = bwOverrideMap[key] !== undefined ? bwOverrideMap[key] : autoFactor > 0;
+    const factor = autoFactor > 0 ? autoFactor : 0.75;
+    const baseBwKg = isBodyweight ? Math.round((profile.weight || 70) * factor) : 0;
+    return { isBodyweight, baseBwKg };
+  };
+
   const toggleSetCompleted = (exIdx: number, exercise: any, setIdx: number) => {
     const key = `${contextPrefix}_${exIdx}`;
     const sets = getSetsForExercise(exIdx, exercise);
     const target = sets[setIdx];
     const nextCompleted = !target.completed;
+    const { baseBwKg } = getExerciseBwInfo(exIdx, exercise);
+    const effectiveLoad = baseBwKg + (target.weight || 0);
 
     let isPR = false;
-    if (nextCompleted && target.weight > 0 && target.reps > 0) {
-      const est1RM = target.weight * (1 + target.reps / 30);
+    if (nextCompleted && effectiveLoad > 0 && target.reps > 0) {
+      const est1RM = effectiveLoad * (1 + target.reps / 30);
       const prevPR = exercisePRs[exercise.name]?.best1RM || 0;
       if (est1RM > prevPR) {
         isPR = true;
@@ -425,12 +450,14 @@ export default function Workout() {
       const completed = sList.filter((s) => s.completed);
       if (completed.length === 0) return;
 
+      const { isBodyweight, baseBwKg } = getExerciseBwInfo(idx, ex);
       musclesSet.add(ex.muscle || "General");
       let best1RM = 0;
       completed.forEach((s) => {
-        totalVolumeKg += s.weight * s.reps;
+        const effectiveLoad = baseBwKg + (s.weight || 0);
+        totalVolumeKg += effectiveLoad * s.reps;
         if (s.isPR) prsCount += 1;
-        const est = s.weight > 0 && s.reps > 0 ? s.weight * (1 + s.reps / 30) : 0;
+        const est = effectiveLoad > 0 && s.reps > 0 ? effectiveLoad * (1 + s.reps / 30) : 0;
         if (est > best1RM) best1RM = est;
       });
 
@@ -438,7 +465,8 @@ export default function Workout() {
         name: ex.name,
         muscle: ex.muscle || "General",
         sets: sList,
-        best1RM: Math.round(best1RM * 10) / 10
+        best1RM: Math.round(best1RM * 10) / 10,
+        baseBodyweightKg: isBodyweight ? baseBwKg : 0
       });
     });
 
@@ -707,7 +735,13 @@ export default function Workout() {
                         return (
                           <div key={eIdx} style={{ fontSize: "0.76rem", color: "var(--text-muted)" }}>
                             <strong style={{ color: "white" }}>{ex.name}:</strong>{" "}
-                            {done.map((s) => `${s.weight}kg×${s.reps}${s.isPR ? "🏆" : ""}`).join(" · ")}
+                            {done
+                              .map((s) =>
+                                ex.baseBodyweightKg
+                                  ? `PC${s.weight > 0 ? `+${s.weight}kg` : ""}×${s.reps}${s.isPR ? "🏆" : ""}`
+                                  : `${s.weight}kg×${s.reps}${s.isPR ? "🏆" : ""}`
+                              )
+                              .join(" · ")}
                           </div>
                         );
                       })}
@@ -1039,6 +1073,8 @@ export default function Workout() {
                 const prevSets = getLastExercisePerformance(exercise.name);
                 const exDoneCount = sets.filter((s) => s.completed).length;
                 const exAllDone = exDoneCount === sets.length;
+                const { isBodyweight, baseBwKg } = getExerciseBwInfo(exIdx, exercise);
+                const bwKey = `${contextPrefix}_${exIdx}`;
 
                 return (
                   <div
@@ -1065,10 +1101,35 @@ export default function Workout() {
                           {deloadMode && (
                             <span style={{ color: "#FBBF24", fontWeight: 800 }}>🛡️ Deload</span>
                           )}
+                          {isBodyweight && (
+                            <span style={{ color: "var(--accent)", fontWeight: 700 }}>
+                              🤸 PC (~{baseBwKg}kg base)
+                            </span>
+                          )}
                           {exercise.rest && <span style={{ color: "var(--text-muted)" }}>⏱️ {exercise.rest}</span>}
                         </div>
                       </div>
-                      <div style={{ display: "flex", gap: "0.35rem", alignItems: "center" }}>
+                      <div style={{ display: "flex", gap: "0.3rem", alignItems: "center", flexWrap: "wrap", justifyContent: "flex-end" }}>
+                        <button
+                          onClick={() =>
+                            setBwOverrideMap((prev) => ({
+                              ...prev,
+                              [bwKey]: !isBodyweight
+                            }))
+                          }
+                          style={{
+                            padding: "0.3rem 0.45rem",
+                            borderRadius: "8px",
+                            fontSize: "0.7rem",
+                            fontWeight: 800,
+                            background: isBodyweight ? "var(--accent-subtle)" : "rgba(255,255,255,0.06)",
+                            border: isBodyweight ? "1px solid var(--accent-border)" : "1px solid transparent",
+                            color: isBodyweight ? "var(--accent)" : "var(--text-muted)"
+                          }}
+                          title="Alternar entre peso corporal (PC + Lastre) o carga externa (kg)"
+                        >
+                          {isBodyweight ? "PC" : "kg"}
+                        </button>
                         <button
                           onClick={() => {
                             const maxW = Math.max(0, ...sets.map((s) => s.weight || 0));
@@ -1138,14 +1199,18 @@ export default function Workout() {
                       >
                         <span>Set</span>
                         <span>Anterior</span>
-                        <span style={{ textAlign: "center" }}>kg</span>
+                        <span style={{ textAlign: "center" }}>{isBodyweight ? "+Lastre" : "kg"}</span>
                         <span style={{ textAlign: "center" }}>Reps</span>
                         <span style={{ textAlign: "center" }}>OK</span>
                       </div>
 
                       {sets.map((s, sIdx) => {
                         const prevLabel = prevSets?.[sIdx]
-                          ? `${prevSets[sIdx].weight}kg×${prevSets[sIdx].reps}`
+                          ? isBodyweight
+                            ? prevSets[sIdx].weight > 0
+                              ? `+${prevSets[sIdx].weight}×${prevSets[sIdx].reps}`
+                              : `PC×${prevSets[sIdx].reps}`
+                            : `${prevSets[sIdx].weight}kg×${prevSets[sIdx].reps}`
                           : "—";
 
                         return (
@@ -1173,10 +1238,12 @@ export default function Workout() {
 
                             <input
                               type="number"
+                              inputMode="decimal"
                               step="0.5"
                               min="0"
+                              className={styles.setInput}
                               value={s.weight || ""}
-                              placeholder="0"
+                              placeholder={isBodyweight ? "PC" : "0"}
                               onChange={(e) => updateSetField(exIdx, exercise, sIdx, "weight", parseFloat(e.target.value) || 0)}
                               style={{
                                 padding: "0.35rem 0.25rem",
@@ -1184,13 +1251,16 @@ export default function Workout() {
                                 fontSize: "0.84rem",
                                 fontWeight: 700,
                                 borderRadius: "8px",
-                                background: "rgba(0,0,0,0.35)"
+                                background: "rgba(0,0,0,0.35)",
+                                color: isBodyweight && !s.weight ? "var(--accent)" : "white"
                               }}
                             />
 
                             <input
                               type="number"
+                              inputMode="numeric"
                               min="0"
+                              className={styles.setInput}
                               value={s.reps || ""}
                               placeholder="10"
                               onChange={(e) => updateSetField(exIdx, exercise, sIdx, "reps", parseInt(e.target.value, 10) || 0)}
